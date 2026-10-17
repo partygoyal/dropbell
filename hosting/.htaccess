@@ -1,0 +1,15 @@
+<FilesMatch "\.php$">
+    SetHandler application/x-lsphp84
+</FilesMatch>
+Options -Indexes
+DirectoryIndex index.php
+RewriteEngine On
+RewriteRule (^|/)\. - [F,L]
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://dropbell.in%{REQUEST_URI} [R=301,L]
+RewriteRule ^backend-api(?:/|$) laravel.php [L]
+RewriteRule ^(?:admin|vendor)(?:/|$) laravel.php [L]
+RewriteRule ^api/(?:health|products)(?:/|$) laravel.php [L]
+RewriteRule ^$ index.php [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [L]
