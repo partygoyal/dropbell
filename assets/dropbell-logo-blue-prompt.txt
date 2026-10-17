@@ -1,0 +1,8 @@
+Generated using the built-in image generation tool.
+
+Use case: logo-brand.
+Design a revised original logo for "dropbell", an online quick delivery service for everyday goods and items, similar in category to Blinkit. "Drop" means delivering a parcel at a doorstep, NEVER a water droplet.
+Use the previous logo only as reference for its clean lowercase bold geometric wordmark and simple horizontal composition. Redesign its symbol entirely: a compact, distinctive rounded parcel / delivery bag silhouette with a clever bell or doorbell detail integrated through negative space, communicating doorstep delivery and arrival. No teardrop, water drop, liquid or water imagery. Keep the symbol extremely simple and readable at app-icon sizes, with balanced visual weight beside the wordmark.
+Exact text: "dropbell", all lowercase, carefully kerned friendly bold geometric sans-serif.
+Color palette: rich royal blue and deep navy blue only; symbol may use two flat blue shades, wordmark deep navy. No orange, orange is reserved for product CTAs. No gradients.
+Deliver one polished horizontal logo lockup on a genuinely transparent background, generous clear space. Flat vector-like clean edges. No mockups, presentation boards, taglines, extra words, shadows or 3D.

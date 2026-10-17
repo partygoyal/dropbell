@@ -1,0 +1,13 @@
+Homepage visual concept generated using the built-in image generation tool. Sample products and prices are illustrative.
+
+Use case: ui-mockup. Create a polished high-fidelity DESKTOP HOMEPAGE DESIGN for Dropbell, an Indian online quick delivery service for groceries and everyday goods. This is a website design image, straight-on flat full-page screenshot, not a device mockup. Reference image is the approved brand wordmark: navy lowercase "dropbell" with an open-box o and bell counter in b. Reproduce this small in the header, all navy, not as a giant image.
+Visual direction: sophisticated friendly commerce, white background, deep navy typography, royal blue and pale blue brand surfaces, orange exclusively for primary CTAs and ADD buttons. Clean precise grid, rounded cards, ample whitespace, highly readable real text, no gradients.
+Show a full desktop homepage about 1440px wide:
+1 Header with small Dropbell wordmark left, location selector "Deliver to" / "Select your location", wide search field "Search for groceries, essentials & more", account icon and cart.
+2 Slim category navigation: All categories, Fruits & vegetables, Dairy & breakfast, Snacks & drinks, Home essentials.
+3 Wide pale-blue hero with editorial oversized navy headline "Your everyday essentials. At your doorstep." short supporting line "Fresh groceries, household favourites, and more — all in one place." Orange "Start shopping" button. On right, beautiful photorealistic arrangement of fresh produce, milk, bread and household goods emerging from a blue delivery carton; tidy premium art direction. Small blue delivery badge "Fresh picks. Quick drops." Avoid unsupported exact delivery-time promises.
+4 Category section titled "What’s on your list?" with eight equal small category cards, clean product photography: Fruits & vegetables, Dairy & eggs, Bakery, Snacks, Beverages, Personal care, Cleaning, Pet care.
+5 Section "Everyday favourites" with five realistic product cards, tasteful photographs on pale neutral backgrounds, category label, name, quantity, rupee price, orange outlined ADD buttons: Bananas 6 pcs ₹48, Fresh milk 500 ml ₹30, Brown bread 400 g ₹45, Farm eggs 6 pcs ₹60, Tomatoes 500 g ₹25.
+6 Two compact promotional panels in blue tones, "Breakfast, sorted." and "A little restock goes a long way." with relevant products and discreet shopping links.
+7 Minimal footer with navy wordmark, help and company links.
+Keep the hero above the fold, storefront useful and shopping-first, visually consistent with refined modern grocery apps but original Dropbell identity. No purple, no orange logo, no separate droplet icon, no browser chrome, no annotations or design measurements. Render legible complete polished homepage as one image.

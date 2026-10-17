@@ -1,0 +1,7 @@
+Generated using the built-in image generation tool.
+
+Use case: logo-brand. Revise the attached dropbell custom wordmark to integrate symbols through letter design, without color changes. Exact text: "dropbell", lowercase d r o p b e l l.
+ALL eight characters must use the SAME single flat deep navy blue as the existing normal d/r/p/e/l/l. No royal blue, light blue, highlights, shading or different-colored letters.
+Redesign the o as a recognizable lowercase o whose thick outer contour subtly becomes a compact open parcel: squared-soft lower corners, hollow negative-space counter, and two short neatly folded lid shapes integrated into its upper rim. It must read both as an o and an open box, not a separate illustration replacing a letter. Keep its baseline, body height and stroke weight consistent with the surrounding letters.
+Redesign the b as a recognizable lowercase b with its tall vertical stem retained, while shaping its rounded bowl/counter into a bell silhouette, with a restrained small clapper cutout/detail integrated below. The bell should emerge from the actual letter construction rather than appearing as a large icon stamped inside an ordinary b.
+Preserve the friendly bold geometric typography of the other letters. Carefully balanced spacing and optical weight, readable at small sizes. One cohesive sophisticated single-color wordmark. No standalone icon, no 3D box, no gradients, no shadows, no textures, no extra text. Truly transparent background and generous outer clear space.
