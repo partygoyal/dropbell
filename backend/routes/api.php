@@ -35,6 +35,8 @@ Route::get('/products/{id}', function (Request $request, int $id) {
     return response()->json(['data' => Marketplace::present($product)]);
 })->whereNumber('id');
 
+Route::post('/customer/sample-quote', [CustomerOrderController::class, 'sampleQuote'])->middleware('throttle:30,1,sample-quote:');
+Route::post('/customer/sample-orders', [CustomerOrderController::class, 'storeSample'])->middleware('throttle:10,1,sample-orders:');
 Route::post('/customer/auth/request', [CustomerController::class, 'requestOtp'])->middleware('throttle:10,1');
 Route::post('/customer/auth/verify', [CustomerController::class, 'verifyOtp'])->middleware('throttle:15,1');
 Route::prefix('customer')->middleware([AuthenticateCustomer::class, 'throttle:120,1'])->group(function () {

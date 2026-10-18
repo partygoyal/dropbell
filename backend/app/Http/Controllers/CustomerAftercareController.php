@@ -61,6 +61,7 @@ class CustomerAftercareController extends Controller
         $invoice = DB::transaction(function () use ($request, $reference) {
             $order = DB::table('orders')->where('reference', $reference)->where('user_id', $request->user()->id)->lockForUpdate()->first();
             abort_unless($order, 404);
+            abort_if($order->is_sample, 422, 'Sample orders do not generate sales invoices.');
             $existing = DB::table('order_invoices')->where('order_id', $order->id)->first();
             if ($existing) {
                 return $existing;

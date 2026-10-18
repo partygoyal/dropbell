@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-const allowed = /^(auth\/(request|verify)|me|logout|quote|addresses(?:\/\d+)?|requests|transactions|orders(?:\/[a-zA-Z0-9-]+(?:\/(?:requests|invoice))?)?)$/;
+const allowed = /^(auth\/(request|verify)|me|logout|quote|sample-quote|sample-orders|addresses(?:\/\d+)?|requests|transactions|orders(?:\/[a-zA-Z0-9-]+(?:\/(?:requests|invoice))?)?)$/;
 async function proxy(request, { params }) {
   const { path } = await params;
   const endpoint = path.join('/');
@@ -21,7 +21,7 @@ async function proxy(request, { params }) {
       return new NextResponse(await upstream.text(), { status: 200, headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': upstream.headers.get('content-disposition') || 'attachment; filename="invoice.html"', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } });
     }
     const body = await upstream.json();
-    const issuedToken = endpoint === 'auth/verify' && upstream.ok ? body.token : null;
+    const issuedToken = ['auth/verify', 'sample-orders'].includes(endpoint) && upstream.ok ? body.token : null;
     delete body.token;
     const response = NextResponse.json(body, { status: upstream.status, headers: { 'Cache-Control': 'no-store' } });
     if (issuedToken) response.cookies.set('dropbell_customer', issuedToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 604800 });

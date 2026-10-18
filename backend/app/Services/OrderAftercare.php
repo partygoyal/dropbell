@@ -9,7 +9,7 @@ class OrderAftercare
 {
     public static function payment(object $order): object
     {
-        DB::table('order_transactions')->insertOrIgnore(['order_id' => $order->id, 'operation_key' => 'payment:'.$order->id, 'type' => 'payment', 'status' => $order->payment_status === 'paid' ? 'completed' : ($order->status === 'cancelled' ? 'voided' : 'pending'), 'amount_paise' => $order->total_paise, 'method' => 'cod', 'created_at' => $order->created_at, 'updated_at' => now()]);
+        DB::table('order_transactions')->insertOrIgnore(['order_id' => $order->id, 'operation_key' => 'payment:'.$order->id, 'type' => 'payment', 'status' => $order->is_sample ? 'voided' : ($order->payment_status === 'paid' ? 'completed' : ($order->status === 'cancelled' ? 'voided' : 'pending')), 'amount_paise' => $order->is_sample ? 0 : $order->total_paise, 'method' => 'cod', 'created_at' => $order->created_at, 'updated_at' => now()]);
 
         return DB::table('order_transactions')->where('operation_key', 'payment:'.$order->id)->first();
     }

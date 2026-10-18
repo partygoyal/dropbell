@@ -98,6 +98,9 @@ class AdminAftercareController extends Controller
         DB::transaction(function () use ($request, $id, $input): void {
             $order = DB::table('orders')->where('id', $id)->lockForUpdate()->first();
             abort_unless($order, 404);
+            if ($order->is_sample) {
+                throw ValidationException::withMessages(['reference' => 'Test COD orders do not collect real payments.']);
+            }
             if ($order->status !== 'delivered') {
                 throw ValidationException::withMessages(['payment' => 'Record collection only after delivery.']);
             }
