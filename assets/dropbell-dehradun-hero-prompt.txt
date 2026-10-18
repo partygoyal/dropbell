@@ -1,0 +1,5 @@
+Generated with the built-in image generation tool.
+
+Photorealistic 3:1 hero background for Dropbell in Dehradun: royal blue delivery courier seen from behind on the right, blue insulated delivery backpack with a white bell emblem, green Dehradun valley and Himalayan mountains behind him. Pale sky-blue negative space on the left for HTML copy. Bright natural daylight, polished commercial photography, blue brand palette #0755b6. No text or UI baked into the image.
+
+Asset: homepage/public/assets/dehradun-delivery-hero.png
