@@ -37,8 +37,10 @@ Route::get('/products/{id}', function (Request $request, int $id) {
 
 Route::post('/customer/sample-quote', [CustomerOrderController::class, 'sampleQuote'])->middleware('throttle:30,1,sample-quote:');
 Route::post('/customer/sample-orders', [CustomerOrderController::class, 'storeSample'])->middleware('throttle:10,1,sample-orders:');
-Route::post('/customer/auth/request', [CustomerController::class, 'requestOtp'])->middleware('throttle:10,1');
-Route::post('/customer/auth/verify', [CustomerController::class, 'verifyOtp'])->middleware('throttle:15,1');
+Route::post('/customer/auth/demo/request', [CustomerController::class, 'requestDemoOtp'])->middleware('throttle:20,1,demo-otp-request:');
+Route::post('/customer/auth/demo/verify', [CustomerController::class, 'verifyDemoOtp'])->middleware('throttle:30,1,demo-otp-verify:');
+Route::post('/customer/auth/request', [CustomerController::class, 'requestOtp'])->middleware('throttle:10,1,otp-request:');
+Route::post('/customer/auth/verify', [CustomerController::class, 'verifyOtp'])->middleware('throttle:15,1,otp-verify:');
 Route::prefix('customer')->middleware([AuthenticateCustomer::class, 'throttle:120,1'])->group(function () {
     Route::post('/quote', [CustomerOrderController::class, 'quote']);
     Route::get('/me', [CustomerController::class, 'profile']);

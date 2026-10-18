@@ -29,12 +29,32 @@ class CustomerController extends Controller
         return response()->json(['challenge_id' => $id, 'local_code' => $code, 'message' => 'Local development code. No SMS was sent.']);
     }
 
-    public function verifyOtp(Request $request): JsonResponse
+    public function requestDemoOtp(Request $request): JsonResponse
+    {
+        $input = $request->validate(['phone' => ['required', 'regex:/^[6-9]\d{9}$/']]);
+        $key = 'customer-demo-otp:'.$input['phone'];
+        if (RateLimiter::tooManyAttempts($key, 3)) {
+            return response()->json(['message' => 'Please wait '.RateLimiter::availableIn($key).' seconds before generating another temporary code.'], 429);
+        }
+        RateLimiter::hit($key, 300);
+        $id = (string) Str::uuid();
+        $code = (string) random_int(100000, 999999);
+        DB::table('customer_otps')->insert(['id' => $id, 'phone' => $input['phone'], 'is_demo' => true, 'code_hash' => Hash::make($code), 'expires_at' => now()->addMinutes(5), 'created_at' => now(), 'updated_at' => now()]);
+
+        return response()->json(['challenge_id' => $id, 'demo_code' => $code, 'message' => 'Temporary demo code. Expires in 5 minutes. Your mobile number is not verified.'])->header('Cache-Control', 'private, no-store');
+    }
+
+    public function verifyDemoOtp(Request $request): JsonResponse
+    {
+        return $this->verifyOtp($request, true);
+    }
+
+    public function verifyOtp(Request $request, bool $demo = false): JsonResponse
     {
         $input = $request->validate(['challenge_id' => 'required|uuid', 'code' => 'required|digits:6']);
-        $result = DB::transaction(function () use ($input) {
+        $result = DB::transaction(function () use ($input, $demo) {
             $challenge = DB::table('customer_otps')->where('id', $input['challenge_id'])->lockForUpdate()->first();
-            if (! $challenge || $challenge->expires_at <= now() || $challenge->attempts >= 5) {
+            if (! $challenge || (bool) $challenge->is_demo !== $demo || $challenge->expires_at <= now() || $challenge->attempts >= 5) {
                 return null;
             }
             if (! Hash::check($input['code'], $challenge->code_hash)) {
@@ -43,12 +63,18 @@ class CustomerController extends Controller
                 return null;
             }
             DB::table('customer_otps')->where('id', $challenge->id)->delete();
-            $user = User::firstOrCreate(['phone' => $challenge->phone], ['name' => 'Dropbell customer', 'email' => $challenge->phone.'@customer.dropbell.invalid', 'password' => Str::random(64)]);
+            if ($demo) {
+                $user = User::create(['name' => 'Demo customer', 'email' => 'demo-'.$challenge->id.'@dropbell.invalid', 'password' => Str::random(64)]);
+                $user->is_sample_guest = true;
+                $user->save();
+            } else {
+                $user = User::firstOrCreate(['phone' => $challenge->phone], ['name' => 'Dropbell customer', 'email' => $challenge->phone.'@customer.dropbell.invalid', 'password' => Str::random(64)]);
+            }
             if ($user->is_admin || $user->is_vendor) {
                 return null;
             }
             $token = bin2hex(random_bytes(32));
-            DB::table('customer_tokens')->insert(['user_id' => $user->id, 'token_hash' => hash('sha256', $token), 'expires_at' => now()->addDays(7), 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('customer_tokens')->insert(['user_id' => $user->id, 'token_hash' => hash('sha256', $token), 'expires_at' => $demo ? now()->addHours(6) : now()->addDays(7), 'created_at' => now(), 'updated_at' => now()]);
 
             return $token;
         });
@@ -61,7 +87,7 @@ class CustomerController extends Controller
         $user = $request->user();
         $addresses = DB::table('addresses')->where('user_id', $user->id)->orderByDesc('is_default')->get()->map(fn ($item) => ['id' => (string) $item->id, 'label' => $item->label, 'name' => $item->name, 'phone' => $item->phone, 'street' => $item->street, 'city' => $item->city, 'pin' => $item->postal_code, 'isDefault' => (bool) $item->is_default]);
 
-        return response()->json(['data' => ['name' => $user->name, 'phone' => $user->phone, 'addresses' => $addresses]]);
+        return response()->json(['data' => ['isDemo' => (bool) $user->is_sample_guest, 'name' => $user->name, 'phone' => $user->phone, 'addresses' => $addresses]]);
     }
 
     public function updateProfile(Request $request): JsonResponse
