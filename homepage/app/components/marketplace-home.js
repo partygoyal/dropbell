@@ -61,7 +61,7 @@ export default function MarketplaceHome({ managedCategories, subCategories, prod
   };
   return <div className="marketplace-home">
     <section className="market-hero" aria-labelledby="market-hero-title">
-      <img className="market-hero-background" src="/assets/dehradun-delivery-hero.png" alt="A Dropbell delivery partner overlooking Dehradun and the Himalayas" fetchPriority="high" />
+      <img className="market-hero-background" width="2172" height="724" src="/assets/dehradun-delivery-hero.png" alt="A Dropbell delivery partner overlooking Dehradun and the Himalayas" fetchPriority="high" />
       <div className="market-hero-inner"><div className="market-hero-copy"><MarketBrand hero />
         <h1 id="market-hero-title"><strong>Dehradun</strong> ka apna <strong>Online Marketplace</strong></h1>
         <p>Groceries, Fruits, Vegetables, Sweets, Dairy,<br className="desktop-break" /> Bakery, Household & More...</p>
@@ -70,7 +70,7 @@ export default function MarketplaceHome({ managedCategories, subCategories, prod
     </section>
 
     <div className="market-content">
-      <section className="market-categories" id="categories" aria-labelledby="market-categories-title"><div className="market-section-heading"><h2 id="market-categories-title">What would you like to order today?</h2><button onClick={() => chooseFilter('All')}>View All Categories <MarketIcon name="arrow" /></button></div><div className="market-category-grid">{shoppingCategories.map(item => <button key={item.label} className="market-category-card" onClick={() => browse(item)}><span className="market-category-art" style={item.photo ? subCategoryImageStyle(item.art, item.photo) : categoryImageStyle(item.art)} aria-hidden="true" /><b>{item.label}</b></button>)}</div></section>
+      <section className="market-categories" id="categories" aria-labelledby="market-categories-title"><div className="market-section-heading"><h2 id="market-categories-title">What would you like to order today?</h2><button onClick={() => chooseFilter('All')}>View All Categories <MarketIcon name="arrow" /></button></div><div className="market-category-grid">{shoppingCategories.map(item => <button key={item.label} className="market-category-card" onClick={() => browse(item)}><span className="market-category-frame"><span className="market-category-art" style={item.photo ? subCategoryImageStyle(item.art, item.photo) : categoryImageStyle(item.art)} aria-hidden="true" /></span><b>{item.label}</b></button>)}</div></section>
 
       <section className="market-stores" id="stores" aria-labelledby="market-stores-title"><div className="market-section-heading"><div><h2 id="market-stores-title">Local stores. Everyday favourites.</h2><p>Discover the essentials your neighbourhood has to offer.</p></div><button onClick={() => chooseFilter('All')}>Explore All <MarketIcon name="arrow" /></button></div><div className="market-store-grid">{storeDepartments.map(store => <button key={store.name} className="market-store-card" onClick={() => browse(shoppingCategories[store.category])}><span className={`market-store-emblem ${store.color}`}><MarketIcon name={store.icon} /></span><b>{store.name}</b><span>{store.caption}</span><small>Explore category <MarketIcon name="arrow" /></small></button>)}</div></section>
 
