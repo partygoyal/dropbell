@@ -99,10 +99,10 @@ class CustomerApiTest extends TestCase
         $this->postJson('/api/customer/orders', $payload)->assertCreated();
         $id = DB::table('orders')->value('id');
         $this->actingAs(User::factory()->create(['is_admin' => true]));
-        $this->patch('/admin/orders/'.$id, ['status' => 'cancelled'])->assertRedirect();
-        $this->patch('/admin/orders/'.$id, ['status' => 'cancelled'])->assertRedirect();
+        $this->patch('/admin/orders/'.$id, ['status' => 'cancelled', 'revision' => DB::table('orders')->where('id', $id)->value('revision'), 'reason' => 'Customer requested cancellation'])->assertRedirect();
+        $this->patch('/admin/orders/'.$id, ['status' => 'cancelled', 'revision' => DB::table('orders')->where('id', $id)->value('revision'), 'reason' => 'Customer requested cancellation'])->assertRedirect();
         $this->assertDatabaseHas('products', ['id' => $payload['items'][0]['id'], 'stock_quantity' => 4]);
-        $this->patchJson('/admin/orders/'.$id, ['status' => 'received'])->assertUnprocessable();
+        $this->patchJson('/admin/orders/'.$id, ['status' => 'received', 'revision' => DB::table('orders')->where('id', $id)->value('revision'), 'reason' => 'Customer requested cancellation'])->assertUnprocessable();
         $this->get('/admin/orders/'.$id)->assertOk();
     }
 
@@ -115,7 +115,7 @@ class CustomerApiTest extends TestCase
         $id = DB::table('orders')->value('id');
         $this->actingAs(User::factory()->create(['is_admin' => true]));
         $this->getJson('/admin/orders/notifications')->assertOk()->assertJsonPath('count', 1)->assertJsonPath('orders.0.url', route('admin.orders.show', $id));
-        $this->patch('/admin/orders/'.$id, ['status' => 'picking'])->assertRedirect();
+        $this->patch('/admin/orders/'.$id, ['status' => 'picking', 'revision' => DB::table('orders')->where('id', $id)->value('revision'), 'reason' => 'Customer requested cancellation'])->assertRedirect();
         $this->getJson('/admin/orders/notifications')->assertOk()->assertJsonPath('count', 0)->assertJsonCount(0, 'orders');
     }
 

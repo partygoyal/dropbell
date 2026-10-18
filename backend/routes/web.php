@@ -55,6 +55,7 @@ Route::middleware(EnsureAdmin::class)->group(function () {
     Route::get('/admin/orders', [AdminOrderController::class, 'index'])->name('admin.orders.index');
     Route::get('/admin/orders/notifications', [AdminOrderController::class, 'notifications'])->name('admin.orders.notifications');
     Route::get('/admin/orders/{id}', [AdminOrderController::class, 'show'])->whereNumber('id')->name('admin.orders.show');
+    Route::patch('/admin/orders/{id}/partner', [AdminOrderController::class, 'assign'])->whereNumber('id')->name('admin.orders.assign');
     Route::patch('/admin/orders/{id}', [AdminOrderController::class, 'update'])->whereNumber('id')->name('admin.orders.update');
     Route::resource('/admin/products', AdminProductController::class)->except(['show', 'destroy'])->names('admin.products');
     Route::get('/admin', [AdminController::class, 'dashboard'])->name('admin.dashboard');

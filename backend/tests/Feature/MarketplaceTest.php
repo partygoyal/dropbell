@@ -144,7 +144,7 @@ class MarketplaceTest extends TestCase
         $items[array_key_first($items)] = 2;
         $this->put('/admin/orders/'.$order->id, ['revision' => 0, 'address' => $address, 'quantities' => $items, 'delivery_preference' => 'standard', 'reason' => 'Customer requests another pack'])->assertRedirect();
         $this->assertDatabaseHas('orders', ['id' => $order->id, 'total_paise' => 22500]);
-        $this->patch('/admin/orders/'.$order->id, ['status' => 'cancelled'])->assertRedirect();
+        $this->patch('/admin/orders/'.$order->id, ['status' => 'cancelled', 'revision' => DB::table('orders')->where('id', $order->id)->value('revision'), 'reason' => 'Customer requested cancellation'])->assertRedirect();
         $this->assertDatabaseCount('stock_movements', 0);
         $this->assertDatabaseHas('products', ['id' => $milk, 'stock_quantity' => 0]);
         $this->assertDatabaseHas('vendor_products', ['id' => $milkOffer, 'available' => true]);
@@ -158,7 +158,7 @@ class MarketplaceTest extends TestCase
         DB::table('vendors')->where('user_id', $owner->id)->update(['status' => 'suspended']);
         $this->area();
         $this->actingAs($owner)->put('/vendor/onboarding', ['revision' => 0, 'business_name' => 'Shop', 'pickup_address' => 'Road', 'city' => 'City', 'postal_code' => '560001', 'service_postal_codes' => ['560001']])->assertForbidden();
-        $this->put('/vendor/products/'.$id,['revision' => 1, 'available' => 1, 'price' => '60'])->assertForbidden();
-        $this->getJson('/api/products')->assertJsonCount(0,'data');
+        $this->put('/vendor/products/'.$id, ['revision' => 1, 'available' => 1, 'price' => '60'])->assertForbidden();
+        $this->getJson('/api/products')->assertJsonCount(0, 'data');
     }
 }

@@ -158,4 +158,63 @@ class AdminManagementTest extends TestCase
         $this->assertDatabaseHas('orders', ['id' => $id, 'discount_paise' => 1200, 'total_paise' => 13300]);
         $this->assertDatabaseHas('products', ['id' => $productId, 'stock_quantity' => 8]);
     }
+
+    public function test_stale_status_submission_cannot_cancel_a_newer_order(): void
+    {
+        $this->admin();
+        [$id] = $this->order();
+        $this->patch('/admin/orders/'.$id, ['status' => 'picking', 'revision' => 0])->assertRedirect();
+
+        $this->patchJson('/admin/orders/'.$id, ['status' => 'cancelled', 'revision' => 0, 'reason' => 'Customer changed their mind'])->assertUnprocessable()->assertJsonValidationErrors('revision');
+
+        $this->assertDatabaseHas('orders', ['id' => $id, 'status' => 'picking', 'revision' => 1]);
+        $this->assertDatabaseCount('order_events', 1);
+        $this->assertDatabaseCount('stock_movements', 0);
+    }
+
+    public function test_cancellation_requires_a_reason_and_cannot_restore_dispatched_stock(): void
+    {
+        $this->admin();
+        [$id, $productId] = $this->order();
+        $this->patchJson('/admin/orders/'.$id, ['status' => 'cancelled', 'revision' => 0])->assertUnprocessable()->assertJsonValidationErrors('reason');
+        DB::table('orders')->where('id', $id)->update(['status' => 'out_for_delivery']);
+
+        $this->patchJson('/admin/orders/'.$id, ['status' => 'cancelled', 'revision' => 0, 'reason' => 'Customer changed their mind'])->assertUnprocessable()->assertJsonValidationErrors('status');
+
+        $this->assertDatabaseHas('orders', ['id' => $id, 'status' => 'out_for_delivery']);
+        $this->assertDatabaseHas('products', ['id' => $productId, 'stock_quantity' => 8]);
+        $this->assertDatabaseCount('order_events', 0);
+        $this->assertDatabaseCount('stock_movements', 0);
+    }
+
+    public function test_partner_assignment_requires_admin_and_approved_kyc(): void
+    {
+        [$id] = $this->order();
+        $partner = DB::table('delivery_partners')->insertGetId(['name' => 'Asha', 'phone' => '9876543210', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $payload = ['revision' => 0, 'delivery_partner_id' => $partner, 'reason' => 'Rider available nearby'];
+        $this->patch('/admin/orders/'.$id.'/partner', $payload)->assertRedirect('/admin/login');
+        $this->actingAs(User::factory()->create())->patch('/admin/orders/'.$id.'/partner', $payload)->assertForbidden();
+        $this->admin();
+        $this->patchJson('/admin/orders/'.$id.'/partner', $payload)->assertUnprocessable()->assertJsonValidationErrors('delivery_partner_id');
+        DB::table('delivery_partner_kycs')->insert(['delivery_partner_id' => $partner, 'legal_name' => 'Asha', 'address' => 'Test address', 'city' => 'Bengaluru', 'postal_code' => '560001', 'document_type' => 'passport', 'identity_path' => 'test-id.jpg', 'address_path' => 'test-address.jpg', 'status' => 'approved', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('orders')->where('id', $id)->update(['status' => 'out_for_delivery']);
+
+        $this->patch('/admin/orders/'.$id.'/partner', $payload)->assertRedirect('/admin/orders/'.$id);
+
+        $this->assertDatabaseHas('orders', ['id' => $id, 'delivery_partner_id' => $partner, 'revision' => 1, 'total_paise' => 13300]);
+        $this->assertDatabaseHas('order_events', ['order_id' => $id, 'action' => 'Delivery partner assigned']);
+        $this->patchJson('/admin/orders/'.$id.'/partner', $payload)->assertUnprocessable()->assertJsonValidationErrors('revision');
+        DB::table('orders')->where('id', $id)->update(['status' => 'delivered']);
+        $this->patchJson('/admin/orders/'.$id.'/partner', array_replace($payload, ['revision' => 1]))->assertUnprocessable()->assertJsonValidationErrors('delivery_partner_id');
+        $this->assertDatabaseCount('order_events', 1);
+    }
+
+    public function test_order_queue_searches_customer_phone_and_filters_payment(): void
+    {
+        $this->admin();
+        [$id] = $this->order();
+        $this->get('/admin/orders?q=9876543210&payment=pending')->assertOk()->assertSee(DB::table('orders')->where('id', $id)->value('reference'));
+        $this->get('/admin/orders?q=Customer&payment=paid')->assertOk()->assertDontSee(DB::table('orders')->where('id', $id)->value('reference'));
+        $this->get('/admin/orders/'.$id)->assertOk()->assertSee('Assign delivery partner')->assertSee('name="revision"', false)->assertDontSee('value="delivered"', false);
+    }
 }

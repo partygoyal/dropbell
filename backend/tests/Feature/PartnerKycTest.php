@@ -139,17 +139,17 @@ class PartnerKycTest extends TestCase
         $itemId = DB::table('order_items')->insertGetId(['order_id' => $orderId, 'product_id' => $productId, 'product_name' => 'Milk', 'pack_size' => '1 litre', 'unit_price_paise' => 10000, 'quantity' => 1, 'created_at' => now(), 'updated_at' => now()]);
         $edit = ['revision' => 0, 'address' => $address, 'quantities' => [$itemId => 1], 'delivery_preference' => 'standard', 'delivery_partner_id' => $id, 'reason' => 'Assign rider'];
         $this->putJson('/admin/orders/'.$orderId, $edit)->assertUnprocessable()->assertJsonValidationErrors('delivery_partner_id');
-        $this->patchJson('/admin/orders/'.$orderId, ['status' => 'out_for_delivery'])->assertUnprocessable();
+        $this->patchJson('/admin/orders/'.$orderId, ['status' => 'out_for_delivery', 'revision' => DB::table('orders')->where('id', $orderId)->value('revision'), 'reason' => 'Customer requested cancellation'])->assertUnprocessable();
         $this->submit($id);
         $this->patch('/admin/delivery-partners/'.$id.'/kyc/review', ['revision' => 1, 'status' => 'approved'])->assertRedirect();
         $this->put('/admin/orders/'.$orderId, $edit)->assertRedirect('/admin/orders/'.$orderId);
         DB::table('delivery_partners')->where('id', $id)->update(['active' => false]);
-        $this->patchJson('/admin/orders/'.$orderId, ['status' => 'out_for_delivery'])->assertUnprocessable();
+        $this->patchJson('/admin/orders/'.$orderId, ['status' => 'out_for_delivery', 'revision' => DB::table('orders')->where('id', $orderId)->value('revision'), 'reason' => 'Customer requested cancellation'])->assertUnprocessable();
         DB::table('delivery_partners')->where('id', $id)->update(['active' => true]);
         DB::table('products')->where('id', $productId)->update(['expires_on' => today('Asia/Kolkata')->subDay()->toDateString()]);
-        $this->patchJson('/admin/orders/'.$orderId, ['status' => 'out_for_delivery'])->assertUnprocessable()->assertJsonValidationErrors('status');
+        $this->patchJson('/admin/orders/'.$orderId, ['status' => 'out_for_delivery', 'revision' => DB::table('orders')->where('id', $orderId)->value('revision'), 'reason' => 'Customer requested cancellation'])->assertUnprocessable()->assertJsonValidationErrors('status');
         DB::table('products')->where('id', $productId)->update(['expires_on' => null]);
-        $this->patch('/admin/orders/'.$orderId, ['status' => 'out_for_delivery'])->assertRedirect();
+        $this->patch('/admin/orders/'.$orderId, ['status' => 'out_for_delivery', 'revision' => DB::table('orders')->where('id', $orderId)->value('revision'), 'reason' => 'Customer requested cancellation'])->assertRedirect();
         $this->assertDatabaseHas('orders', ['id' => $orderId, 'status' => 'out_for_delivery']);
     }
 }

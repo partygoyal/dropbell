@@ -166,7 +166,7 @@ class OrderAftercareTest extends TestCase
         $order = $this->order();
         $id = $this->customerRequest($order, 'cancellation');
         $this->admin();
-        $this->patch('/admin/orders/'.$order->id, ['status' => 'cancelled'])->assertRedirect();
+        $this->patch('/admin/orders/'.$order->id, ['status' => 'cancelled', 'revision' => DB::table('orders')->where('id', $order->id)->value('revision'), 'reason' => 'Customer requested cancellation'])->assertRedirect();
         $this->patch('/admin/requests/'.$id, $this->review($id, 'approved', 0))->assertRedirect();
         $this->assertDatabaseHas('customer_requests', ['id' => $id, 'status' => 'completed']);
         $this->assertDatabaseCount('order_transactions', 1);

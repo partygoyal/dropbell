@@ -32,13 +32,17 @@ class AdminOrderController extends Controller
 
     public function index(Request $request): View
     {
-        $input = $request->validate(['q' => 'nullable|string|max:120', 'status' => 'nullable|in:received,picking,out_for_delivery,delivered,cancelled']);
+        $input = $request->validate(['q' => 'nullable|string|max:120', 'status' => 'nullable|in:received,picking,out_for_delivery,delivered,cancelled', 'payment' => 'nullable|in:pending,paid']);
         $query = DB::table('orders');
         if (! empty($input['q'])) {
-            $query->where('reference', 'like', '%'.$input['q'].'%');
+            $query->where(fn ($search) => $search->where('reference', 'like', '%'.$input['q'].'%')->orWhere('delivery_address', 'like', '%'.$input['q'].'%'));
         }
         if (! empty($input['status'])) {
             $query->where('status', $input['status']);
+        }
+
+        if (! empty($input['payment'])) {
+            $query->where('payment_status', $input['payment']);
         }
 
         return view('admin.orders.index', ['orders' => $query->latest()->paginate(20)->withQueryString()]);
@@ -49,7 +53,7 @@ class AdminOrderController extends Controller
         $order = DB::table('orders')->find($id);
         abort_unless($order, 404);
 
-        return view('admin.orders.show', ['order' => $order, 'items' => DB::table('order_items')->where('order_id', $id)->get(), 'address' => json_decode($order->delivery_address, true), 'partner' => $order->delivery_partner_id ? DB::table('delivery_partners')->find($order->delivery_partner_id) : null, 'events' => DB::table('order_events')->join('users', 'users.id', '=', 'order_events.admin_id')->where('order_id', $id)->select('order_events.*', 'users.name as admin_name')->latest('order_events.id')->get()]);
+        return view('admin.orders.show', ['partners' => DB::table('delivery_partners')->where('active', true)->whereExists(fn ($kyc) => $kyc->selectRaw('1')->from('delivery_partner_kycs')->whereColumn('delivery_partner_kycs.delivery_partner_id', 'delivery_partners.id')->where('status', 'approved'))->orderBy('name')->get(), 'requests' => DB::table('customer_requests')->where('order_id', $id)->latest('id')->get(), 'order' => $order, 'items' => DB::table('order_items')->where('order_id', $id)->get(), 'address' => json_decode($order->delivery_address, true), 'partner' => $order->delivery_partner_id ? DB::table('delivery_partners')->find($order->delivery_partner_id) : null, 'events' => DB::table('order_events')->join('users', 'users.id', '=', 'order_events.admin_id')->where('order_id', $id)->select('order_events.*', 'users.name as admin_name')->latest('order_events.id')->get()]);
     }
 
     public function edit(int $id): View
@@ -190,16 +194,41 @@ class AdminOrderController extends Controller
         return redirect()->route('admin.orders.show', $id)->with('status', 'Order updated. Totals have been recalculated.');
     }
 
+    public function assign(Request $request, int $id): RedirectResponse
+    {
+        $input = $request->validate(['revision' => 'required|integer|min:0', 'delivery_partner_id' => 'required|integer|exists:delivery_partners,id', 'reason' => 'required|string|min:5|max:2000']);
+        DB::transaction(function () use ($request, $id, $input) {
+            $order = DB::table('orders')->where('id', $id)->lockForUpdate()->first();
+            abort_unless($order, 404);
+            if ((int) $order->revision !== (int) $input['revision']) {
+                throw ValidationException::withMessages(['revision' => 'This order changed. Reload the page before assigning a partner.']);
+            }
+            if (! in_array($order->status, ['received', 'picking', 'out_for_delivery'], true)) {
+                throw ValidationException::withMessages(['delivery_partner_id' => 'Final orders cannot be reassigned.']);
+            }
+            if (! DB::table('delivery_partners')->where('id', $input['delivery_partner_id'])->where('active', true)->whereExists(fn ($kyc) => $kyc->selectRaw('1')->from('delivery_partner_kycs')->whereColumn('delivery_partner_kycs.delivery_partner_id', 'delivery_partners.id')->where('status', 'approved'))->lockForUpdate()->exists()) {
+                throw ValidationException::withMessages(['delivery_partner_id' => 'Choose an active delivery partner with approved KYC.']);
+            }
+            DB::table('orders')->where('id', $id)->update(['delivery_partner_id' => $input['delivery_partner_id'], 'revision' => $order->revision + 1, 'updated_at' => now()]);
+            OrderAftercare::event($id, $request->user()->id, 'Delivery partner assigned', ['from' => $order->delivery_partner_id, 'to' => (int) $input['delivery_partner_id'], 'reason' => $input['reason']]);
+        }, 3);
+
+        return redirect()->route('admin.orders.show', $id)->with('status', 'Delivery partner assigned.');
+    }
+
     public function update(Request $request, int $id): RedirectResponse
     {
-        $input = $request->validate(['status' => 'required|in:received,picking,out_for_delivery,delivered,cancelled']);
+        $input = $request->validate(['revision' => 'required|integer|min:0', 'status' => 'required|in:received,picking,out_for_delivery,delivered,cancelled', 'reason' => 'required_if:status,cancelled|nullable|string|min:5|max:2000']);
         DB::transaction(function () use ($id, $input, $request) {
             $order = DB::table('orders')->where('id', $id)->lockForUpdate()->first();
             abort_unless($order, 404);
+            if ((int) $order->revision !== (int) $input['revision']) {
+                throw ValidationException::withMessages(['revision' => 'This order changed. Reload the page before updating it.']);
+            }
             if ($order->status === $input['status']) {
                 return;
             }
-            $next = ['received' => ['picking', 'cancelled'], 'picking' => ['out_for_delivery', 'cancelled'], 'out_for_delivery' => ['delivered', 'cancelled'], 'delivered' => [], 'cancelled' => []];
+            $next = ['received' => ['picking', 'cancelled'], 'picking' => ['out_for_delivery', 'cancelled'], 'out_for_delivery' => ['delivered'], 'delivered' => [], 'cancelled' => []];
             if (! in_array($input['status'], $next[$order->status] ?? [], true)) {
                 throw ValidationException::withMessages(['status' => 'That status transition is not allowed.']);
             }
@@ -213,17 +242,11 @@ class AdminOrderController extends Controller
                 throw ValidationException::withMessages(['status' => 'An assigned vendor is not approved. Resolve the vendor fulfilment before dispatch.']);
             }
             if ($input['status'] === 'cancelled') {
-                OrderAftercare::payment($order);
-                DB::table('order_transactions')->where('order_id', $id)->where('type', 'payment')->where('status', 'pending')->update(['status' => 'voided', 'updated_at' => now()]);
-                foreach (DB::table('order_items')->where('order_id', $id)->orderBy('product_id')->get() as $item) {
-                    if ($item->product_id && ! $item->vendor_id) {
-                        $product = DB::table('products')->where('id', $item->product_id)->lockForUpdate()->first();
-                        Inventory::change($product, $item->quantity, 'order_cancelled', 'Reserved stock restored after order cancellation.', $request->user()->id, $id);
-                    }
-                }
+                OrderAftercare::cancel($order, $request->user()->id, $input['reason']);
+            } else {
+                DB::table('orders')->where('id', $id)->update(['status' => $input['status'], 'revision' => $order->revision + 1, 'updated_at' => now()]);
             }
-            DB::table('orders')->where('id', $id)->update(['status' => $input['status'], 'revision' => $order->revision + 1, 'updated_at' => now()]);
-            DB::table('order_events')->insert(['order_id' => $id, 'admin_id' => $request->user()->id, 'action' => 'Status updated', 'details' => json_encode(['from' => $order->status, 'to' => $input['status']]), 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('order_events')->insert(['order_id' => $id, 'admin_id' => $request->user()->id, 'action' => 'Status updated', 'details' => json_encode(['from' => $order->status, 'to' => $input['status'], 'reason' => $input['reason'] ?? null]), 'created_at' => now(), 'updated_at' => now()]);
         }, 3);
 
         return back()->with('status', 'Order status updated.');
