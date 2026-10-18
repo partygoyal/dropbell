@@ -24,10 +24,10 @@ export function MarketIcon({ name, className = '' }) {
   return <svg className={`market-icon ${className}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name] || paths.store}</svg>;
 }
 
-export function MarketBrand({ hero = false }) {
+export function MarketBrand({ hero = false, caption = true }) {
   return <span className={`market-brand${hero ? ' market-brand-hero' : ''}`}>
-    <svg className="market-brand-mark" viewBox="0 0 62 64" fill="currentColor" aria-hidden="true"><path d="M15 4h17c17 0 27 10 27 26S47 57 29 57H4l8-37h12l-6 26h13c9 0 15-6 15-15S41 16 32 16H12l3-12Z" /><path d="M25 34c3-2 2-6 4-8 1-2 5-2 6 0 2 2 1 6 4 8v3H25v-3Zm5 5h4c0 4-4 4-4 0Z" /><path d="M4 12h13v3H4Zm-3 6h13v3H1Z" /></svg>
-    <span><b>Dropbell</b><small>{hero ? 'Sab Kuch, Ab Aapke Ghar Tak' : 'Delivery Company Private Limited'}</small></span>
+    <img className="approved-brand-logo" src="/assets/dropbell-logo-approved.svg" width="2010" height="550" alt="Dropbell" />
+    {caption && <small>{hero ? 'Sab Kuch, Ab Aapke Ghar Tak' : 'Delivery Company Private Limited'}</small>}
   </span>;
 }
 
@@ -61,7 +61,7 @@ export default function MarketplaceHome({ managedCategories, subCategories, prod
   };
   return <div className="marketplace-home">
     <section className="market-hero" aria-labelledby="market-hero-title">
-      <img className="market-hero-background" width="2172" height="724" src="/assets/dehradun-delivery-hero.png" alt="A Dropbell delivery partner overlooking Dehradun and the Himalayas" fetchPriority="high" />
+      <img className="market-hero-background" width="2172" height="724" src="/assets/dehradun-delivery-approved-brand.png" alt="A Dropbell delivery partner overlooking Dehradun and the Himalayas" fetchPriority="high" />
       <div className="market-hero-inner"><div className="market-hero-copy"><MarketBrand hero />
         <h1 id="market-hero-title"><strong>Dehradun</strong> ka apna <strong>Online Marketplace</strong></h1>
         <p>Groceries, Fruits, Vegetables, Sweets, Dairy,<br className="desktop-break" /> Bakery, Household & More...</p>

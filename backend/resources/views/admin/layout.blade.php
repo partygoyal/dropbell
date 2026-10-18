@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>@yield('title', 'Dashboard') · Dropbell Admin</title><link rel="stylesheet" href="{{ asset('admin.css') }}"><script src="{{ asset('admin.js') }}" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>@yield('title', 'Dashboard') · Dropbell Admin</title><link rel="stylesheet" href="{{ asset('admin.css') }}?v=approved-logo-v1"><script src="{{ asset('admin.js') }}" defer></script><link rel="icon" type="image/svg+xml" href="{{ asset('assets/dropbell-brand-icon.svg') }}"></head>
 <body><div class="admin-shell">
 <aside class="sidebar">
-<a class="brand" href="{{ route('admin.dashboard') }}">dropbell<span>ADMIN</span></a>
+<a class="brand" href="{{ route('admin.dashboard') }}"><img class="approved-brand-logo" src="{{ asset('assets/dropbell-logo-approved.svg') }}" width="2010" height="550" alt="Dropbell"><span>ADMIN</span></a>
 <p class="nav-label">WORKSPACE</p>
 @foreach([['admin.dashboard', 'admin.dashboard', '◫', 'Overview'], ['admin.customers.*', 'admin.customers.index', '♙', 'Registered users'], ['admin.orders.*', 'admin.orders.index', '▤', 'Manage orders'], ['admin.requests.*', 'admin.requests.index', '↩', 'Returns & refunds'], ['admin.transactions.*', 'admin.transactions.index', '₹', 'Transactions'], ['admin.products.*', 'admin.products.index', '▦', 'Manage products'], ['admin.vendors.*', 'admin.vendors.index', '▣', 'Manage vendors'], ['admin.categories.*', 'admin.categories.index', '◈', 'Manage categories'], ['admin.sub-categories.*', 'admin.sub-categories.index', '⋮', 'Manage sub-categories'], ['admin.delivery-areas.*', 'admin.delivery-areas.index', '⌖', 'Delivery areas'], ['admin.delivery-partners.*', 'admin.delivery-partners.index', '♧', 'Delivery partners']] as [$pattern, $destination, $icon, $label])
 <a @class(['selected' => (request()->routeIs($pattern) || ($destination === 'admin.delivery-partners.index' && request()->routeIs('admin.partner-kyc.*')))]) @if((request()->routeIs($pattern) || ($destination === 'admin.delivery-partners.index' && request()->routeIs('admin.partner-kyc.*')))) aria-current="page" @endif href="{{ route($destination) }}"><span class="nav-icon" aria-hidden="true">{{ $icon }}</span>{{ $label }}</a>

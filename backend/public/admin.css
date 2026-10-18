@@ -26,3 +26,6 @@
 .vendor-workspace .offer-form button{min-height:42px;padding:0 18px}
 @media(max-width:1050px){.vendor-product-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.vendor-product-filters .filter-actions{grid-column:1/-1;justify-content:flex-start}}
 @media(max-width:650px){.vendor-product-filters{grid-template-columns:minmax(0,1fr);padding:20px;gap:16px}.vendor-product-filters .filter-actions{grid-column:1;flex-wrap:wrap}.vendor-product-filters .filter-selection{min-height:32px}}
+/* The approved logo is shared with the storefront and printed invoices. */
+.brand .approved-brand-logo{display:block;width:216px;max-width:100%;height:auto;object-fit:contain;background:#fff;border-radius:6px;padding:8px}
+.sidebar .brand .approved-brand-logo{width:180px}

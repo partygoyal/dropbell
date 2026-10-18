@@ -2,6 +2,7 @@ import './globals.css';
 import './marketplace.css';
 
 export const metadata = {
+  icons: { icon: '/assets/dropbell-brand-icon.svg', shortcut: '/assets/dropbell-brand-icon.svg' },
   title: 'Dropbell | Dehradun’s Online Marketplace',
   description: 'Sab Kuch, Ab Aapke Ghar Tak. Shop groceries, fresh produce, dairy and everyday essentials from local stores in Dehradun.',
 };

@@ -288,3 +288,38 @@ footer.market-footer { display: block; padding: 21px max(3.5%, calc((100vw - 136
   html { scroll-behavior: auto; }
   .market-category-card, .market-store-card { transition: none; }
 }
+
+/* All brand placements use the same approved artwork and intrinsic proportions. */
+.market-brand {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  width: 216px;
+  max-width: 100%;
+  padding: 8px 10px;
+  background: #fff;
+  border-radius: 6px;
+  color: #0657b8;
+  white-space: normal;
+}
+.approved-brand-logo { display: block; width: 100%; height: auto; object-fit: contain; }
+.market-brand > small { font-size: 8px; line-height: 1.3; margin: 0; font-weight: 600; }
+.market-brand-hero { width: 365px; padding: 0; background: transparent; border-radius: 0; }
+.market-brand-hero > small { font-size: 17px; font-weight: 800; letter-spacing: -.4px; }
+.market-footer .market-brand { width: 200px; }
+.market-footer .market-brand > small { font-size: 7px; }
+.market-footer-signoff .market-brand { width: 140px; padding: 5px 7px; }
+.market-footer-signoff .approved-brand-logo { width: 100%; }
+@media (max-width: 1100px) {
+  .market-header .market-brand { width: 190px; }
+  .market-brand-hero { width: 330px; }
+  .market-brand-hero > small { font-size: 15px; }
+}
+@media (max-width: 540px) {
+  .market-header .market-brand { width: 168px; padding: 6px 8px; gap: 4px; }
+  .market-header .market-brand > small { font-size: 6px; }
+  .market-brand-hero { width: 280px; }
+  .market-brand-hero > small { font-size: 12px; }
+  .market-footer .market-brand { width: 190px; }
+}

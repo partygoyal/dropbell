@@ -1,0 +1,10 @@
+Built-in image generation edit, background-extraction.
+
+Remove only the black background from the approved client-supplied Dropbell logo, keeping the blue D-and-bell symbol, white details, Dropbell wordmark, colors, lettering and proportions. Transparent PNG; no redesign or added elements.
+
+Original: assets/dropbell-logo-approved-source.jpeg
+Web asset: homepage/public/assets/dropbell-logo-approved.svg
+Transparent bitmap: homepage/public/assets/dropbell-logo-approved.png
+
+Hero edit: replace only the lone bell on the delivery backpack with a white patch bearing the approved blue D-and-Dropbell lockup, preserving the original Dehradun photograph and wide composition. Built-in image generation edit.
+Hero asset: homepage/public/assets/dehradun-delivery-approved-brand.png
