@@ -35,11 +35,11 @@ const shoppingCategories = [
   { label: 'Groceries', match: /grocery|atta|rice|pulses/i, art: 'Atta, Rice & Pulses' },
   { label: 'Vegetables', match: /fruit|vegetable|fresh/i, sub: /fresh vegetables/i, art: 'Fruits & Vegetables', photo: 'Fresh Vegetables' },
   { label: 'Fruits', match: /fruit|vegetable|fresh/i, sub: /fresh fruits/i, art: 'Fruits & Vegetables', photo: 'Fresh Fruits' },
-  { label: 'Sweets', match: /sweet|chocolate|snack/i, art: 'Biscuits, Chocolates & Sweets' },
+  { label: 'Sweets', match: /sweet|chocolate/i, fallback: /snack/i, art: 'Biscuits, Chocolates & Sweets' },
   { label: 'Dairy', match: /dairy|breakfast/i, art: 'Dairy, Bread & Eggs' },
   { label: 'Bakery', match: /bakery|bread|breakfast/i, sub: /bread|bun/i, art: 'Dairy, Bread & Eggs', photo: 'Bread & Buns' },
   { label: 'Household', match: /household|cleaning|^home$/i, art: 'Cleaning & Household Essentials' },
-  { label: 'More', match: /personal|beauty/i, art: 'Personal Care & Hygiene' },
+  { label: 'More', match: /^All$/, art: 'Personal Care & Hygiene' },
 ];
 
 const storeDepartments = [
@@ -54,7 +54,8 @@ const storeDepartments = [
 export default function MarketplaceHome({ managedCategories, subCategories, products, Quantity, chooseFilter }) {
   const router = useRouter();
   const browse = item => {
-    const parent = managedCategories.find(category => item.match.test(category.name));
+    const parent = managedCategories.find(category => item.match.test(category.name))
+      || (item.fallback && managedCategories.find(category => item.fallback.test(category.name)));
     const sub = parent && item.sub && subCategories.find(category => Number(category.category_id) === Number(parent.id) && item.sub.test(category.name));
     if (sub) router.push(`/category/${encodeURIComponent(parent.name.toLowerCase())}/${sub.id}`, { scroll: false });
     else chooseFilter(parent?.name || 'All');
