@@ -70,8 +70,8 @@ export default function Storefront({ category = 'All', productId = null, view = 
       const catalogueCategories = body.categories || [];
       setManagedCategories(catalogueCategories.filter(item => !legacyReplacements[item.name] || !catalogueCategories.some(other => other.name === legacyReplacements[item.name]) || body.data.some(product => product.category === item.name)));
       setSubCategories(body.sub_categories || []);
-      const icons = { Fresh: '🥬', Breakfast: '🥛', Snacks: '🍿', Home: '🧴' };
-      setProducts(body.data.map(item => ({ id: Number(item.id), name: item.name, cat: item.category, subCategoryId: item.sub_category_id, qty: item.pack_size, price: item.price_paise / 100, stock: Number(item.max_order_quantity || 99), photo: item.image_url || null, emoji: icons[item.category] || '📦', description: item.description, care: item.care_instructions })));
+      const icons = { 'Fruits & Vegetables': '🥬', 'Dairy, Bread & Eggs': '🥛', 'Atta, Rice & Pulses': '🌾', 'Oils, Spices & Cooking Essentials': '🫙', 'Snacks & Namkeen': '🍿', 'Biscuits, Chocolates & Sweets': '🍫', 'Breakfast & Spreads': '🍯', 'Instant & Packaged Foods': '🍜', 'Sauces, Pickles & Condiments': '🥫', Beverages: '🧃', 'Frozen Foods & Ice Cream': '🍦', 'Personal Care & Hygiene': '🧼', 'Beauty & Grooming': '🧴', 'Cleaning & Household Essentials': '🧹', 'Baby Care': '🍼', 'Pet Care': '🐾', Fresh: '🥬', Breakfast: '🥛', Snacks: '🍿', Home: '🧴' };
+      setProducts(body.data.map(item => ({ id: Number(item.id), name: item.name, cat: item.category, subCategoryId: item.sub_category_id, qty: item.pack_size, price: item.price_paise / 100, stock: Number(item.max_order_quantity ?? 99), inventory: item.stock_quantity, sample: !!item.is_sample, photo: item.image_url || null, emoji: icons[item.category] || '📦', description: item.description, care: item.care_instructions })));
       setCatalogueError(''); setCatalogueReady(true);
     } catch { setCatalogueError('The catalogue is temporarily unavailable. Please try again shortly.'); }
   };
@@ -129,6 +129,7 @@ export default function Storefront({ category = 'All', productId = null, view = 
 
 
   function Quantity({ product }) {
+    if (product.sample) return <span className="out-of-stock">Sample preview</span>;
     if (!product.stock) return <span className="out-of-stock">Out of stock</span>;
     return cart[product.id] ? <div className="stepper" aria-label={`Quantity for ${product.name}`}><button onClick={() => changeQuantity(product.id, -1)} aria-label={`Remove one ${product.name}`}>−</button><span>{cart[product.id]}</span><button onClick={() => changeQuantity(product.id, 1)} aria-label={`Add one ${product.name}`}>+</button></div> : <button className="add" onClick={() => changeQuantity(product.id, 1)} aria-label={`Add ${product.name} to bag`}>ADD +</button>;
   }
@@ -138,6 +139,7 @@ export default function Storefront({ category = 'All', productId = null, view = 
     <CategoryNavigation departments={departments} selected={filter} onSelect={chooseFilter} view={view} onAbout={() => setModal('about')} onPartner={() => setModal('partner')} />
     <main className={view === 'home' ? 'market-main' : 'market-inner-main'}>
       {catalogueError && <div className="catalogue-connection" role="alert"><p>{catalogueError}</p><button className="secondary" onClick={loadCatalogue}>Retry connection</button></div>}
+      {products.some(product => product.sample) && <p className="catalogue-sample-notice" role="note">Sample catalogue: labelled products show illustrative prices and quantities. Sample products cannot be ordered; real vendor offers will replace these previews.</p>}
       {!catalogueReady && !catalogueError && <p role="status">Loading the latest essentials…</p>}
       {view === 'product' && catalogueReady && !products.some(product => product.id === productId) && <div className="purchase-empty"><h1>This product is unavailable.</h1><Link href="/category/all" className="primary">Browse essentials →</Link></div>}
       {['login', 'account', 'addresses', 'orders', 'transactions', 'requests', 'help'].includes(view) ? <AccountViews key={view} view={view} products={products} setCart={setCart} /> : ['cart', 'checkout', 'order'].includes(view) ? <PurchaseFlow view={view} orderId={orderId} products={products} cart={cart} setCart={setCart} ready={ready && catalogueReady} location={location} Quantity={Quantity} /> : view === 'catalog' ? <CatalogView managedCategories={managedCategories} subCategories={subCategories} category={filter} products={products} query={query} setQuery={setQuery} chooseFilter={chooseFilter} Quantity={Quantity} /> : view === 'product' ? <ProductView product={products.find(item => item.id === productId)} products={products} Quantity={Quantity} /> : <MarketplaceHome managedCategories={managedCategories} subCategories={subCategories} products={products} Quantity={Quantity} chooseFilter={chooseFilter} />}

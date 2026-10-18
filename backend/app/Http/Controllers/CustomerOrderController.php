@@ -55,7 +55,7 @@ class CustomerOrderController extends Controller
             if (! $product) {
                 throw ValidationException::withMessages(['items' => 'A product is no longer available. Refresh your bag.']);
             }
-            $offer = Marketplace::selectOffer($product->id, $postalCode, $lock);
+            $offer = Marketplace::selectOffer($product->id, $postalCode, $lock, $item['quantity']);
             $product->price_paise = $offer->price_paise;
             $product->vendor_offer = $offer;
             $subtotal += $offer->price_paise * $item['quantity'];
@@ -64,7 +64,7 @@ class CustomerOrderController extends Controller
             throw ValidationException::withMessages(['coupon' => 'DROP10 requires an items subtotal of ₹100.']);
         }
         $discount = ! empty($coupon) ? min(5000, (int) round($subtotal * .1)) : 0;
-        $rules = DeliveryPricing::rules($postalCode, $lock);
+        $rules = DeliveryPricing::rules($postalCode, $lock, $item['quantity']);
         $delivery = DeliveryPricing::fee($rules, $subtotal);
         $total = $subtotal - $discount + $delivery;
 
@@ -92,6 +92,7 @@ class CustomerOrderController extends Controller
             $id = DB::table('orders')->insertGetId(['reference' => (string) Str::uuid(), 'user_id' => $request->user()->id, 'request_key' => $input['request_key'], 'delivery_address' => json_encode($input['address']), 'delivery_rules' => json_encode($rules), 'status' => 'received', 'payment_status' => 'pending', 'subtotal_paise' => $subtotal, 'discount_paise' => $discount, 'delivery_paise' => $delivery, 'total_paise' => $total, 'delivery_preference' => $input['delivery'], 'payment_method' => 'cod', 'coupon_code' => $input['coupon'] ?? null, 'created_at' => now(), 'updated_at' => now()]);
             foreach ($input['items'] as $item) {
                 $product = $products->get($item['id']);
+                Marketplace::changeStock($product->vendor_offer->id, -$item['quantity']);
                 DB::table('order_items')->insert(Marketplace::snapshot($product->vendor_offer) + ['order_id' => $id, 'product_id' => $product->id, 'product_name' => $product->name, 'pack_size' => $product->pack_size, 'unit_price_paise' => $product->price_paise, 'quantity' => $item['quantity'], 'created_at' => now(), 'updated_at' => now()]);
             }
 

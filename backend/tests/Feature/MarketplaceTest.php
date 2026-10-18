@@ -110,7 +110,7 @@ class MarketplaceTest extends TestCase
         $this->getJson('/api/products')->assertJsonCount(0, 'data');
         $a = $this->publishProduct($id, 6000, ['560001']);
         $b = $this->publishProduct($id, 5000, ['110001']);
-        $this->getJson('/api/products')->assertJsonCount(1, 'data')->assertJsonPath('data.0.price_paise', 5000)->assertJsonMissingPath('data.0.vendor_id')->assertJsonMissingPath('data.0.stock_quantity');
+        $this->getJson('/api/products')->assertJsonCount(1, 'data')->assertJsonPath('data.0.price_paise', 5000)->assertJsonMissingPath('data.0.vendor_id')->assertJsonPath('data.0.stock_quantity', null);
         $this->getJson('/api/products?postal_code=560001')->assertJsonCount(1, 'data')->assertJsonPath('data.0.price_paise', 6000);
         $this->getJson('/api/products?postal_code=400001')->assertJsonCount(0, 'data');
         DB::table('vendors')->where('id', DB::table('vendor_products')->where('id', $b)->value('vendor_id'))->update(['status' => 'pending']);

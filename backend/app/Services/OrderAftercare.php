@@ -33,6 +33,9 @@ class OrderAftercare
             throw ValidationException::withMessages(['status' => 'This order can no longer be cancelled before dispatch. Reject the request or arrange a return.']);
         }
         foreach (DB::table('order_items')->where('order_id', $order->id)->orderBy('product_id')->get() as $item) {
+            if ($item->vendor_product_id) {
+                Marketplace::changeStock($item->vendor_product_id, $item->quantity);
+            }
             if ($item->product_id && ! $item->vendor_id) {
                 $product = DB::table('products')->where('id', $item->product_id)->lockForUpdate()->first();
                 Inventory::change($product, $item->quantity, 'order_cancelled', $reason, $adminId, $order->id);

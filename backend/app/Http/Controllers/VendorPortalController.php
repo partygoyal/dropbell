@@ -45,7 +45,7 @@ class VendorPortalController extends Controller
     {
         $input = $request->validate(['category' => 'nullable|exists:categories,name', 'sub_category_id' => 'nullable|integer|exists:sub_categories,id', 'q' => 'nullable|string|max:120', 'selected' => 'nullable|in:1']);
         $vendor = $request->attributes->get('vendor');
-        $query = Marketplace::catalogue()->leftJoin('vendor_products', fn ($join) => $join->on('products.id', '=', 'vendor_products.product_id')->where('vendor_products.vendor_id', $vendor->id))->select('products.*', 'vendor_products.price_paise as vendor_price', 'vendor_products.available as vendor_available', 'vendor_products.revision as offer_revision');
+        $query = Marketplace::catalogue()->leftJoin('vendor_products', fn ($join) => $join->on('products.id', '=', 'vendor_products.product_id')->where('vendor_products.vendor_id', $vendor->id))->select('products.*', 'vendor_products.price_paise as vendor_price', 'vendor_products.available as vendor_available', 'vendor_products.revision as offer_revision', 'vendor_products.stock_quantity as vendor_stock');
         if (! empty($input['category'])) {
             $query->where('products.category', $input['category']);
         }
@@ -64,7 +64,7 @@ class VendorPortalController extends Controller
 
     public function saveProduct(Request $request, int $id): RedirectResponse
     {
-        $input = $request->validate(['revision' => 'required|integer|min:0', 'available' => 'required|boolean', 'price' => ['nullable', 'required_if:available,1', 'numeric', 'min:0.01', 'max:100000', 'regex:/^\d+(\.\d{1,2})?$/']]);
+        $input = $request->validate(['revision' => 'required|integer|min:0', 'available' => 'required|boolean', 'stock_quantity' => 'nullable|integer|min:0|max:1000000', 'price' => ['nullable', 'required_if:available,1', 'numeric', 'min:0.01', 'max:100000', 'regex:/^\d+(\.\d{1,2})?$/']]);
         DB::transaction(function () use ($request, $id, $input) {
             $product = Marketplace::catalogue()->where('products.id', $id)->lockForUpdate()->first();
             abort_unless($product, 404);
@@ -74,9 +74,9 @@ class VendorPortalController extends Controller
             if ((int) $input['revision'] !== ($offer?->revision ?? 0)) {
                 throw ValidationException::withMessages(['revision' => 'This offer changed. Reload to see your latest price and availability.']);
             }
-            DB::table('vendor_products')->updateOrInsert(['vendor_id' => $vendor->id, 'product_id' => $id], ['price_paise' => isset($input['price']) ? (int) round((float) $input['price'] * 100) : ($offer?->price_paise ?? 0), 'available' => (bool) $input['available'], 'revision' => ($offer?->revision ?? 0) + 1, 'created_at' => $offer?->created_at ?? now(), 'updated_at' => now()]);
+            DB::table('vendor_products')->updateOrInsert(['vendor_id' => $vendor->id, 'product_id' => $id], ['stock_quantity' => array_key_exists('stock_quantity', $input) ? $input['stock_quantity'] : ($offer?->stock_quantity), 'price_paise' => isset($input['price']) ? (int) round((float) $input['price'] * 100) : ($offer?->price_paise ?? 0), 'available' => (bool) $input['available'], 'revision' => ($offer?->revision ?? 0) + 1, 'created_at' => $offer?->created_at ?? now(), 'updated_at' => now()]);
         });
 
-        return back()->with('status','Your price and availability have been saved.');
+        return back()->with('status', 'Your price and availability have been saved.');
     }
 }

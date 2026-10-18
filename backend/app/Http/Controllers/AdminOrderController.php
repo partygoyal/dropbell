@@ -114,12 +114,14 @@ class AdminOrderController extends Controller
             $products = DB::table('products')->whereIn('id', $productIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
             $isMarketplace = $items->contains(fn ($item) => $item->vendor_id !== null);
             $stockChanges = [];
+            $vendorStockChanges = [];
             $updatedItems = [];
             $subtotal = 0;
             foreach ($items as $item) {
                 $quantity = (int) $input['quantities'][$item->id];
                 $delta = $quantity - $item->quantity;
                 if ($item->vendor_id) {
+                    $vendorStockChanges[$item->vendor_product_id] = ($vendorStockChanges[$item->vendor_product_id] ?? 0) - $delta;
                     if ($quantity && ($delta > 0 || $input['address']['pin'] !== json_decode($order->delivery_address, true)['pin'])) {
                         $valid = Marketplace::offers($input['address']['pin'])->where('vendor_products.id', $item->vendor_product_id)->lockForUpdate()->exists();
                         if (! $valid || ! Marketplace::catalogue()->where('products.id', $item->product_id)->exists()) {
@@ -149,7 +151,8 @@ class AdminOrderController extends Controller
                     throw ValidationException::withMessages(['add_product_id' => 'This item is already in the order. Change its quantity instead.']);
                 }
                 if ($isMarketplace) {
-                    $offer = Marketplace::selectOffer($product->id, $input['address']['pin'], true);
+                    $offer = Marketplace::selectOffer($product->id, $input['address']['pin'], true, $quantity);
+                    $vendorStockChanges[$offer->id] = ($vendorStockChanges[$offer->id] ?? 0) - $quantity;
                     $updatedItems[] = Marketplace::snapshot($offer) + ['product_id' => $product->id, 'product_name' => $product->name, 'pack_size' => $product->pack_size, 'unit_price_paise' => $offer->price_paise, 'quantity' => $quantity];
                     $subtotal += $quantity * $offer->price_paise;
                 } else {
@@ -179,6 +182,12 @@ class AdminOrderController extends Controller
             foreach ($stockChanges as $productId => $delta) {
                 if ($delta !== 0) {
                     Inventory::change($products->get($productId), -$delta, 'order_modified', $input['reason'], $request->user()->id, $id);
+                }
+            }
+            ksort($vendorStockChanges);
+            foreach ($vendorStockChanges as $offerId => $delta) {
+                if ($delta !== 0) {
+                    Marketplace::changeStock($offerId, $delta);
                 }
             }
             DB::table('order_items')->where('order_id', $id)->delete();

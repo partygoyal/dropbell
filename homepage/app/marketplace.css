@@ -323,3 +323,6 @@ footer.market-footer { display: block; padding: 21px max(3.5%, calc((100vw - 136
   .market-brand-hero > small { font-size: 12px; }
   .market-footer .market-brand { width: 190px; }
 }
+
+.catalogue-sample-notice { margin: 16px 0; padding: 14px 18px; border: 1px solid #c9ddf6; border-radius: 12px; background: #eef6ff; color: #16477e; font-size: 14px; line-height: 1.6; }
+.product-stock { min-height: 2.6em; margin: 8px 0; font-size: 12px; line-height: 1.3; color: #526680; }

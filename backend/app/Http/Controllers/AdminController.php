@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Marketplace;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,6 +43,12 @@ class AdminController extends Controller
     public function dashboard(): View
     {
         return view('admin.dashboard', [
+            'storefrontProducts' => Marketplace::publicProducts()->count(),
+            'saleableProducts' => Marketplace::publicProducts()->whereNotNull('market_prices.selling_price')->count(),
+            'sampleProducts' => Marketplace::publicProducts()->whereNull('market_prices.selling_price')->count(),
+            'sampleUnits' => Marketplace::publicProducts()->whereNull('market_prices.selling_price')->sum('products.stock_quantity'),
+            'vendorUnits' => Marketplace::offers()->whereIn('vendor_products.product_id', Marketplace::catalogue()->select('products.id'))->sum('vendor_products.stock_quantity'),
+            'untrackedOffers' => Marketplace::offers()->whereIn('vendor_products.product_id', Marketplace::catalogue()->select('products.id'))->whereNull('vendor_products.stock_quantity')->count(),
             'vendorCount' => DB::table('vendors')->count(),
             'pendingVendors' => DB::table('vendors')->where('status', 'pending')->count(),
             'products' => DB::table('products')->count(),
@@ -53,7 +60,7 @@ class AdminController extends Controller
             'customers' => DB::table('users')->where('is_admin', false)->where('is_vendor', false)->count(),
             'sales' => DB::table('orders')->where('payment_status', 'paid')->sum('total_paise'),
             'recentOrders' => DB::table('orders')->latest()->limit(8)->get(),
-            'catalogue' => DB::table('products')->orderBy('id')->limit(10)->get(),
+            'catalogue' => DB::table('products')->leftJoinSub(Marketplace::publicProducts(), 'storefront_inventory', fn ($join) => $join->on('products.id', '=', 'storefront_inventory.id'))->select('products.*', 'storefront_inventory.selling_price', 'storefront_inventory.sample_preview', 'storefront_inventory.available_stock', 'storefront_inventory.untracked_offers')->orderByRaw('storefront_inventory.selling_price IS NULL')->orderBy('products.id')->limit(10)->get(),
         ]);
     }
 

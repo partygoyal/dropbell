@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Marketplace;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,12 +16,12 @@ class AdminProductController extends Controller
     public function index(Request $request): View
     {
         $input = $request->validate(['q' => 'nullable|string|max:120']);
-        $query = DB::table('products');
+        $query = DB::table('products')->leftJoinSub(Marketplace::publicProducts(), 'storefront_inventory', fn ($join) => $join->on('products.id', '=', 'storefront_inventory.id'))->select('products.*', 'storefront_inventory.selling_price', 'storefront_inventory.sample_preview', 'storefront_inventory.available_stock', 'storefront_inventory.untracked_offers');
         if (! empty($input['q'])) {
-            $query->where('name', 'like', '%'.$input['q'].'%');
+            $query->where('products.name', 'like', '%'.$input['q'].'%');
         }
 
-        return view('admin.products.index', ['products' => $query->orderByDesc('id')->paginate(20)->withQueryString()]);
+        return view('admin.products.index', ['products' => $query->orderByDesc('products.id')->paginate(20)->withQueryString()]);
     }
 
     public function create(): View
@@ -61,7 +62,7 @@ class AdminProductController extends Controller
             'name' => 'required|string|max:255', 'category' => ['required', Rule::exists('categories', 'name')],
             'sub_category_id' => 'nullable|integer|exists:sub_categories,id',
             'pack_size' => 'required|string|max:100', 'price' => ['sometimes', 'numeric', 'min:0.01', 'max:100000', 'regex:/^\d+(\.\d{1,2})?$/'],
-            'active' => 'sometimes|boolean',
+            'active' => 'sometimes|boolean', 'sample_stock_quantity' => 'sometimes|integer|min:0|max:1000000',
             'description' => 'nullable|string|max:5000', 'care_instructions' => 'nullable|string|max:3000',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096', 'remove_image' => 'sometimes|boolean',
         ]);
@@ -74,6 +75,9 @@ class AdminProductController extends Controller
         $row = collect($data)->only(['name', 'category', 'pack_size', 'description', 'care_instructions'])->all();
         $row['sub_category_id'] = $data['sub_category_id'] ?? null;
         $row['price_paise'] = isset($data['price']) ? (int) round((float) $data['price'] * 100) : ($product?->price_paise ?? 0);
+        if ($product?->is_sample && isset($data['sample_stock_quantity'])) {
+            $row['stock_quantity'] = (int) $data['sample_stock_quantity'];
+        }
         $row['active'] = $request->boolean('active');
         $row['updated_at'] = now();
         $row['image_path'] = $product?->image_path;
