@@ -35,6 +35,11 @@ if ($body === false) {
     header('Cache-Control: no-store');
     echo 'Dropbell is temporarily unavailable. Please try again shortly.';
 } else {
+    $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+    if (! str_starts_with($requestPath, '/_next/static/') && ! str_starts_with($requestPath, '/assets/')) {
+        header('Cache-Control: private, no-store, max-age=0');
+        header_remove('ETag');
+    }
     http_response_code(curl_getinfo($upstream, CURLINFO_RESPONSE_CODE));
     echo $body;
 }
