@@ -39,6 +39,8 @@ try {
     const response = await fetch(url + route);
     assert.equal(response.status, 200, route);
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    const html = await response.text();
+    if (route !== '/forgot-password') assert.match(html, /class="vendor-login-button" href="https:\/\/dropbell\.in\/vendor\/login"/);
   }
   const shopCatalogue = await fetch(url + '/api/catalog?locality_id=7&vendor_id=11');
   assert.equal(shopCatalogue.status, 200);

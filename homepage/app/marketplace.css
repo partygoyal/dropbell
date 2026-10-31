@@ -342,3 +342,10 @@ footer.market-footer { display: block; padding: 21px max(3.5%, calc((100vw - 136
 .shop-search { display: flex; flex-direction: column; gap: 9px; max-width: 480px; margin: 24px 0; font-size: 13px; }
 .shop-search input { padding: 13px; border: 1px solid #cbd8e6; border-radius: 9px; color: #15324d; font: inherit; }
 .shop-page .market-store-card b { overflow-wrap: anywhere; }
+
+.vendor-access-bar { display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 9px 5%; background: #eaf3ff; border-bottom: 1px solid #d4e4fa; color: #173955; font-size: 13px; }
+.vendor-login-button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 42px; padding: 10px 18px; border-radius: 8px; background: #0055e8; color: #fff; font-size: 13px; font-weight: 700; text-decoration: none; }
+.vendor-login-button:hover { background: #003fb3; }
+.vendor-login-button:focus-visible { outline: 3px solid #061b50; outline-offset: 3px; }
+.vendor-login-button .market-icon { width: 18px; height: 18px; }
+@media (max-width: 650px) { .vendor-access-bar { justify-content: space-between; padding: 8px 16px; gap: 12px; font-size: 12px; } .vendor-login-button { padding: 9px 14px; font-size: 12px; } }
