@@ -14,7 +14,12 @@ class AdminDeliveryPartnerController extends Controller
 {
     public function index(): View
     {
-        return view('admin.management', ['kind' => 'delivery-partners', 'title' => 'Manage delivery partners', 'record' => null, 'rows' => DB::table('delivery_partners')->leftJoin('delivery_partner_kycs', 'delivery_partner_kycs.delivery_partner_id', '=', 'delivery_partners.id')->select('delivery_partners.*', 'delivery_partner_kycs.status as kyc_status')->selectSub(DB::table('orders')->selectRaw('COUNT(*)')->whereColumn('orders.delivery_partner_id', 'delivery_partners.id')->whereNotIn('status', ['delivered', 'cancelled']), 'open_orders')->orderBy('delivery_partners.name')->paginate(20)]);
+        return view('admin.management', ['kind' => 'delivery-partners', 'title' => 'Manage delivery partners', 'record' => null, 'rows' => DB::table('delivery_partners')->leftJoin('delivery_partner_kycs', 'delivery_partner_kycs.delivery_partner_id', '=', 'delivery_partners.id')->select('delivery_partners.*', 'delivery_partner_kycs.status as kyc_status')->selectSub(DB::table('orders')->selectRaw('COUNT(*)')->whereColumn('orders.delivery_partner_id', 'delivery_partners.id')->whereNotIn('status', ['delivered', 'cancelled']), 'open_orders')->orderBy('delivery_partners.name')->adminPaginate('partners')]);
+    }
+
+    public function create(): View
+    {
+        return view('admin.management', ['kind' => 'delivery-partners', 'title' => 'Add delivery partner', 'record' => null, 'rows' => null]);
     }
 
     public function edit(int $id): View

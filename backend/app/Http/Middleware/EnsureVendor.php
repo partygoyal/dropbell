@@ -16,7 +16,7 @@ class EnsureVendor
         }
         abort_unless($request->user()->is_vendor && ! $request->user()->is_admin, 403);
         $vendor = DB::table('vendors')->where('user_id', $request->user()->id)->first();
-        abort_unless($vendor, 403);
+        abort_unless($vendor && ! $vendor->archived_at, 403);
         $request->attributes->set('vendor', $vendor);
 
         return $next($request);

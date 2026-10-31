@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -80,6 +82,60 @@ class AdminManagementTest extends TestCase
         $this->getJson('/api/products')->assertOk()->assertJsonCount(0, 'data');
         $this->get('/admin/sub-categories')->assertOk();
         $this->get('/admin/sub-categories/'.$sub.'/edit')->assertOk();
+    }
+
+    public function test_both_category_types_support_banner_upload_replacement_removal_and_descriptions(): void
+    {
+        $this->admin();
+        Storage::fake('public');
+        $parent = DB::table('categories')->where('name', 'Fresh')->value('id');
+        foreach (['categories' => 'categories', 'sub-categories' => 'sub_categories'] as $route => $table) {
+            $payload = ['name' => 'Banner '.$route, 'active' => 1, 'description' => 'A short description'];
+            if ($table === 'sub_categories') {
+                $payload['category_id'] = $parent;
+            }
+            $this->post('/admin/'.$route, $payload + ['banner' => UploadedFile::fake()->image('banner.jpg')])->assertRedirect();
+            $record = DB::table($table)->where('name', $payload['name'])->first();
+            $this->assertSame('A short description', $record->description);
+            Storage::disk('public')->assertExists($record->banner_path);
+            $this->get('/admin/'.$route.'/'.$record->id.'/edit')->assertOk()->assertSee('A short description')->assertSee('Remove current banner');
+            $this->put('/admin/'.$route.'/'.$record->id, $payload)->assertRedirect();
+            $this->assertDatabaseHas($table, ['id' => $record->id, 'banner_path' => $record->banner_path]);
+            $this->put('/admin/'.$route.'/'.$record->id, $payload + ['banner' => UploadedFile::fake()->image('replacement.png')])->assertRedirect();
+            Storage::disk('public')->assertMissing($record->banner_path);
+            $replacement = DB::table($table)->where('id', $record->id)->value('banner_path');
+            Storage::disk('public')->assertExists($replacement);
+            $this->put('/admin/'.$route.'/'.$record->id, $payload + ['remove_banner' => 1])->assertRedirect();
+            Storage::disk('public')->assertMissing($replacement);
+            $this->assertDatabaseHas($table, ['id' => $record->id, 'banner_path' => null]);
+        }
+    }
+
+    public function test_category_banners_reject_invalid_files_and_failed_parent_changes_do_not_leak_uploads(): void
+    {
+        $this->admin();
+        Storage::fake('public');
+        $parent = DB::table('categories')->where('name', 'Fresh')->value('id');
+        foreach (['categories', 'sub-categories'] as $route) {
+            $this->postJson('/admin/'.$route, ['name' => 'Invalid banner', 'active' => 1, 'category_id' => $parent, 'description' => str_repeat('x', 301), 'banner' => UploadedFile::fake()->create('banner.svg', 1, 'image/svg+xml')])->assertUnprocessable()->assertJsonValidationErrors(['description', 'banner']);
+            $this->postJson('/admin/'.$route, ['name' => 'Too large', 'active' => 1, 'category_id' => $parent, 'banner' => UploadedFile::fake()->image('banner.jpg')->size(5121)])->assertUnprocessable()->assertJsonValidationErrors('banner');
+        }
+        $this->post('/admin/sub-categories', ['name' => 'Fruit', 'active' => 1, 'category_id' => $parent])->assertRedirect();
+        $id = DB::table('sub_categories')->where('name', 'Fruit')->value('id');
+        $this->product(['sub_category_id' => $id]);
+        $other = DB::table('categories')->where('name', 'Home')->value('id');
+        $this->putJson('/admin/sub-categories/'.$id, ['name' => 'Fruit', 'active' => 1, 'category_id' => $other, 'banner' => UploadedFile::fake()->image('unused.jpg')])->assertUnprocessable();
+        $this->assertSame([], Storage::disk('public')->allFiles('category-banners'));
+    }
+
+    public function test_delivery_partner_list_and_creation_form_are_separate_admin_pages(): void
+    {
+        $this->get('/admin/delivery-partners/create')->assertRedirect('/admin/login');
+        $this->actingAs(User::factory()->create())->get('/admin/delivery-partners/create')->assertForbidden();
+        $this->admin();
+        $this->get('/admin/delivery-partners')->assertOk()->assertSee('Add delivery partner')->assertSee(route('admin.delivery-partners.create'))->assertDontSee('name="phone"', false);
+        $this->get('/admin/delivery-partners/create')->assertOk()->assertSee('name="phone"', false)->assertSee('name="password"', false)->assertSee('Cancel');
+        $this->from('/admin/delivery-partners/create')->post('/admin/delivery-partners', ['name' => 'New Rider', 'phone' => 'invalid', 'active' => 1])->assertRedirect('/admin/delivery-partners/create')->assertSessionHasErrors('phone');
     }
 
     public function test_delivery_partners_can_be_edited_and_assigned_to_order(): void

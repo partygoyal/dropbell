@@ -50,7 +50,7 @@ class CatalogueInventoryTest extends TestCase
 
         $this->assertDatabaseCount('orders', 0);
         $this->assertDatabaseCount('vendors', 0);
-        $this->actingAs(User::factory()->create(['is_admin' => true]))->get('/admin')->assertOk()->assertSee('336 sample previews')->assertSee('6720')->assertSee('Illustrative packs; not physical inventory');
+        $this->actingAs(User::factory()->create(['is_admin' => true]))->get('/admin')->assertOk()->assertSee('336 sample previews')->assertSee('6720')->assertSee('Illustrative packs, excluded from real inventory');
         $this->get('/admin/products')->assertOk()->assertSee('20 sample')->assertSee('Sample preview');
     }
 

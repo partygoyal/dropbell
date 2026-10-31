@@ -26,7 +26,7 @@ class AdminCustomerTest extends TestCase
         $admin = User::factory()->create(['name' => 'Hidden Administrator', 'is_admin' => true]);
         $customer = User::factory()->create(['name' => 'Anika Customer', 'phone' => '9876543210']);
         User::factory()->create(['name' => 'Other Customer', 'phone' => '9123456789']);
-        $this->actingAs($admin)->get('/admin')->assertOk()->assertSee('Registered users')->assertSee('Anika Customer')->assertSee('9876543210');
+        $this->actingAs($admin)->get('/admin')->assertOk()->assertSee('Registered users')->assertViewHas('customers', 2)->assertDontSee('Anika Customer')->assertDontSee('9876543210')->assertDontSee('<table', false);
         $this->get('/admin/customers?q=987654')->assertOk()->assertSee('Anika Customer')->assertDontSee('Other Customer');
         $this->get('/admin/customers?q=Hidden')->assertOk()->assertSee('No registered users match this search.');
         $this->get('/admin/customers/'.$admin->id)->assertNotFound();

@@ -36,7 +36,8 @@ class SupportController extends Controller
         if (! empty($input['status'])) {
             $query->where('status', $input['status']);
         }
-        $rows = $query->orderByDesc('updated_at')->orderByDesc('id')->paginate(20);
+        $query->orderByDesc('updated_at')->orderByDesc('id');
+        $rows = $request->user()->is_admin && ! $request->expectsJson() ? $query->adminPaginate('support') : $query->paginate(20);
         if ($request->user()->is_admin && ! $request->expectsJson()) {
             return view('admin.support', ['tickets' => $rows->through(fn ($t) => $this->present($t, true)), 'status' => $input['status'] ?? '']);
         }

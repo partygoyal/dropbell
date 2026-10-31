@@ -47,7 +47,8 @@ class MarketplaceTest extends TestCase
         $this->get('/vendor')->assertRedirect('/vendor/login');
         $this->post('/vendor/login', ['email' => 'owner@example.test', 'password' => 'secure-password'])->assertRedirect('/vendor');
         $admin = User::factory()->create(['is_admin' => true]);
-        $this->actingAs($admin)->get('/admin/vendors')->assertOk()->assertSee('Neighbourhood Store');
+        $this->post('/admin/login', ['email' => $admin->email, 'password' => 'password'])->assertRedirect('/admin');
+        $this->get('/admin/vendors')->assertOk()->assertSee('Neighbourhood Store');
         $this->get('/admin/vendors/'.$vendorId)->assertOk();
         $this->patch('/admin/vendors/'.$vendorId, ['revision' => 1, 'status' => 'approved'])->assertRedirect();
         $this->assertDatabaseHas('vendors', ['id' => $vendorId, 'status' => 'approved', 'reviewed_by' => $admin->id]);

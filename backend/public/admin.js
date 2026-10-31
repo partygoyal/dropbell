@@ -129,7 +129,7 @@
     panel.tabIndex = 0;
   }
   function select(name, focus = false) {
-    if (!tabs.some(tab => tab.dataset.orderTab === name)) name = 'overview';
+    if (!tabs.some(tab => tab.dataset.orderTab === name)) name = tabs[0].dataset.orderTab;
     for (const tab of tabs) {
       const active = tab.dataset.orderTab === name;
       tab.setAttribute('aria-selected', String(active));
@@ -156,4 +156,22 @@
   }
   window.addEventListener('hashchange', () => select(location.hash.slice(1)));
   select(location.hash.slice(1));
+})();
+
+for (const form of document.querySelectorAll('form[data-confirm]')) {
+  form.addEventListener('submit', event => {
+    if (!window.confirm(form.dataset.confirm)) event.preventDefault();
+  });
+}
+
+(() => {
+  const account = document.querySelector('.admin-account-menu');
+  if (!account) return;
+  const notifications = document.querySelector('.order-notifications');
+  document.addEventListener('click', event => { if (!account.contains(event.target)) account.open = false; });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && account.open) { account.open = false; account.querySelector('summary').focus(); }
+  });
+  account.addEventListener('toggle', () => { if (account.open && notifications) notifications.open = false; });
+  notifications?.addEventListener('toggle', () => { if (notifications.open) account.open = false; });
 })();

@@ -32,7 +32,7 @@ class AdminInventoryController extends Controller
             $query->where('stock_quantity', '>', 0)->where('expires_on', '<', $today);
         }
 
-        return view('admin.inventory.index', ['products' => $query->orderBy('stock_quantity')->orderBy('id')->paginate(20)->withQueryString(), 'today' => $today, 'week' => today('Asia/Kolkata')->addDays(7)->toDateString(), 'lowCount' => DB::table('products')->where('stock_quantity', '>', 0)->whereColumn('stock_quantity', '<=', 'low_stock_threshold')->count(), 'outCount' => DB::table('products')->where('stock_quantity', 0)->count(), 'expiredCount' => DB::table('products')->where('stock_quantity', '>', 0)->where('expires_on', '<', $today)->count(), 'expiringCount' => DB::table('products')->where('stock_quantity', '>', 0)->whereBetween('expires_on', [$today, today('Asia/Kolkata')->addDays(7)->toDateString()])->count()]);
+        return view('admin.inventory.index', ['products' => $query->orderBy('stock_quantity')->orderBy('id')->adminPaginate('inventory')->withQueryString(), 'today' => $today, 'week' => today('Asia/Kolkata')->addDays(7)->toDateString(), 'lowCount' => DB::table('products')->where('stock_quantity', '>', 0)->whereColumn('stock_quantity', '<=', 'low_stock_threshold')->count(), 'outCount' => DB::table('products')->where('stock_quantity', 0)->count(), 'expiredCount' => DB::table('products')->where('stock_quantity', '>', 0)->where('expires_on', '<', $today)->count(), 'expiringCount' => DB::table('products')->where('stock_quantity', '>', 0)->whereBetween('expires_on', [$today, today('Asia/Kolkata')->addDays(7)->toDateString()])->count()]);
     }
 
     public function show(int $id): View
@@ -40,7 +40,7 @@ class AdminInventoryController extends Controller
         $product = DB::table('products')->find($id);
         abort_unless($product, 404);
 
-        return view('admin.inventory.show', ['product' => $product, 'movements' => DB::table('stock_movements')->leftJoin('users', 'users.id', '=', 'stock_movements.actor_id')->leftJoin('orders', 'orders.id', '=', 'stock_movements.order_id')->where('product_id', $id)->select('stock_movements.*', 'users.name as actor_name', 'orders.reference as order_reference')->orderByDesc('stock_movements.id')->paginate(30), 'today' => today('Asia/Kolkata')->toDateString()]);
+        return view('admin.inventory.show', ['product' => $product, 'movements' => DB::table('stock_movements')->leftJoin('users', 'users.id', '=', 'stock_movements.actor_id')->leftJoin('orders', 'orders.id', '=', 'stock_movements.order_id')->where('product_id', $id)->select('stock_movements.*', 'users.name as actor_name', 'orders.reference as order_reference')->orderByDesc('stock_movements.id')->adminPaginate('movements'), 'today' => today('Asia/Kolkata')->toDateString()]);
     }
 
     public function adjust(Request $request, int $id): RedirectResponse
@@ -93,7 +93,7 @@ class AdminInventoryController extends Controller
 
     private function retry(string $key, string $hash, int $productId, int $actorId): bool
     {
-        $movement = DB::table('stock_movements')->where('request_key',$key)->first();
+        $movement = DB::table('stock_movements')->where('request_key', $key)->first();
         if (! $movement) {
             return false;
         }

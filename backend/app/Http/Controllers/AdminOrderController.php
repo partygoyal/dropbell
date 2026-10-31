@@ -48,7 +48,7 @@ class AdminOrderController extends Controller
             $query->where('payment_status', $input['payment']);
         }
 
-        return view('admin.orders.index', ['orders' => $query->latest()->paginate(20)->withQueryString()]);
+        return view('admin.orders.index', ['orders' => $query->latest()->adminPaginate('orders')->withQueryString()]);
     }
 
     public function show(int $id): View

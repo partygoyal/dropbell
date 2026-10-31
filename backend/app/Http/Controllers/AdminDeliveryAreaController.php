@@ -15,6 +15,11 @@ class AdminDeliveryAreaController extends Controller
         return $this->screen();
     }
 
+    public function create(): View
+    {
+        return view('admin.delivery-areas', ['area' => null, 'areas' => null]);
+    }
+
     public function edit(int $id): View
     {
         return $this->screen($id);
@@ -27,7 +32,7 @@ class AdminDeliveryAreaController extends Controller
             abort_unless($area, 404);
         }
 
-        return view('admin.delivery-areas', ['area' => $area, 'areas' => $id ? null : DB::table('delivery_areas')->orderBy('postal_code')->paginate(20)]);
+        return view('admin.delivery-areas', ['area' => $area, 'areas' => $id ? null : DB::table('delivery_areas')->orderBy('postal_code')->adminPaginate('areas')]);
     }
 
     public function store(Request $request): RedirectResponse

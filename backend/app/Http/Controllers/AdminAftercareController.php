@@ -22,7 +22,7 @@ class AdminAftercareController extends Controller
             }
         }
 
-        return view('admin.requests.index', ['requests' => $rows->latest('customer_requests.id')->paginate(20)->withQueryString()]);
+        return view('admin.requests.index', ['requests' => $rows->latest('customer_requests.id')->adminPaginate('requests')->withQueryString()]);
     }
 
     public function show(int $id): View
@@ -134,6 +134,6 @@ class AdminAftercareController extends Controller
             }
         }
 
-        return view('admin.requests.transactions', ['transactions' => $query->latest('order_transactions.id')->paginate(30)->withQueryString()]);
+        return view('admin.requests.transactions', ['transactions' => $query->latest('order_transactions.id')->adminPaginate('transactions')->withQueryString()]);
     }
 }

@@ -21,7 +21,7 @@ class AdminProductController extends Controller
             $query->where('products.name', 'like', '%'.$input['q'].'%');
         }
 
-        return view('admin.products.index', ['products' => $query->orderByDesc('products.id')->paginate(20)->withQueryString()]);
+        return view('admin.products.index', ['products' => $query->orderByDesc('products.id')->adminPaginate('products')->withQueryString()]);
     }
 
     public function create(): View

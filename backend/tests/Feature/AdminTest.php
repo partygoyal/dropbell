@@ -26,7 +26,7 @@ class AdminTest extends TestCase
         $this->post('/admin/login', ['email' => $admin->email, 'password' => 'wrong'])->assertSessionHasErrors('email');
         $this->assertGuest();
         $this->post('/admin/login', ['email' => $admin->email, 'password' => 'test-password-123'])->assertRedirect('/admin');
-        $this->get('/admin')->assertOk()->assertSee('Sweet ripe bananas')->assertSee('Your first order is still ahead.');
+        $this->get('/admin')->assertOk()->assertSee('Total orders')->assertSee('Catalogue products')->assertDontSee('<table', false);
         $this->post('/admin/logout')->assertRedirect('/admin/login');
         $this->assertGuest();
     }

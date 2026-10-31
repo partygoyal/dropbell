@@ -11,6 +11,8 @@ use App\Http\Controllers\AdminLocationController;
 use App\Http\Controllers\AdminOrderController;
 use App\Http\Controllers\AdminPartnerKycController;
 use App\Http\Controllers\AdminProductController;
+use App\Http\Controllers\AdminProfileController;
+use App\Http\Controllers\AdminReportController;
 use App\Http\Controllers\AdminSubCategoryController;
 use App\Http\Controllers\AdminVendorController;
 use App\Http\Controllers\SupportController;
@@ -35,7 +37,10 @@ Route::middleware(EnsureVendor::class)->group(function () {
     Route::put('/vendor/products/{id}', [VendorPortalController::class, 'saveProduct'])->whereNumber('id')->name('vendor.products.save');
     Route::post('/vendor/logout', [VendorAuthController::class, 'logout'])->name('vendor.logout');
 });
-Route::middleware(EnsureAdmin::class)->group(function () {
+Route::middleware([EnsureAdmin::class, 'auth.session'])->group(function () {
+    Route::get('/admin/profile', [AdminProfileController::class, 'edit'])->name('admin.profile.edit');
+    Route::put('/admin/profile', [AdminProfileController::class, 'update'])->name('admin.profile.update');
+    Route::put('/admin/profile/password', [AdminProfileController::class, 'password'])->middleware('throttle:6,1')->name('admin.profile.password');
     Route::get('/admin/support', [SupportController::class, 'index'])->name('admin.support.index');
     Route::get('/admin/support/{id}', [SupportController::class, 'show'])->whereNumber('id')->name('admin.support.show');
     Route::post('/admin/support/{id}/messages', [SupportController::class, 'reply'])->whereNumber('id')->name('admin.support.reply');
@@ -51,6 +56,11 @@ Route::middleware(EnsureAdmin::class)->group(function () {
     Route::patch('/admin/requests/{id}', [AdminAftercareController::class, 'review'])->whereNumber('id')->name('admin.requests.review');
     Route::get('/admin/transactions', [AdminAftercareController::class, 'transactions'])->name('admin.transactions.index');
     Route::post('/admin/orders/{id}/payment', [AdminAftercareController::class, 'payment'])->whereNumber('id')->name('admin.orders.payment');
+    Route::get('/admin/reports', [AdminReportController::class, 'index'])->name('admin.reports.index');
+    Route::get('/admin/reports/export', [AdminReportController::class, 'export'])->name('admin.reports.export');
+    Route::get('/admin/vendors/{id}/edit', [AdminVendorController::class, 'edit'])->whereNumber('id')->name('admin.vendors.edit');
+    Route::put('/admin/vendors/{id}', [AdminVendorController::class, 'update'])->whereNumber('id')->name('admin.vendors.update');
+    Route::delete('/admin/vendors/{id}', [AdminVendorController::class, 'destroy'])->whereNumber('id')->name('admin.vendors.destroy');
     Route::get('/admin/vendors', [AdminVendorController::class, 'index'])->name('admin.vendors.index');
     Route::get('/admin/vendors/{id}', [AdminVendorController::class, 'show'])->whereNumber('id')->name('admin.vendors.show');
     Route::patch('/admin/vendors/{id}', [AdminVendorController::class, 'review'])->whereNumber('id')->name('admin.vendors.review');
@@ -61,10 +71,10 @@ Route::middleware(EnsureAdmin::class)->group(function () {
     Route::post('/admin/delivery-partners/{id}/kyc/approve-without-documents', [AdminPartnerKycController::class, 'approveWithoutDocuments'])->whereNumber('id')->name('admin.partner-kyc.approve-without-documents');
     Route::patch('/admin/delivery-partners/{id}/kyc/review', [AdminPartnerKycController::class, 'review'])->whereNumber('id')->name('admin.partner-kyc.review');
     Route::get('/admin/delivery-partners/{id}/kyc/documents/{kind}', [AdminPartnerKycController::class, 'document'])->whereNumber('id')->whereIn('kind', ['identity', 'address', 'licence'])->name('admin.partner-kyc.document');
-    Route::resource('/admin/delivery-areas', AdminDeliveryAreaController::class)->only(['index', 'store', 'edit', 'update'])->names('admin.delivery-areas');
+    Route::resource('/admin/delivery-areas', AdminDeliveryAreaController::class)->only(['index', 'create', 'store', 'edit', 'update'])->names('admin.delivery-areas');
     Route::resource('/admin/categories', AdminCategoryController::class)->only(['index', 'store', 'edit', 'update'])->names('admin.categories');
     Route::resource('/admin/sub-categories', AdminSubCategoryController::class)->only(['index', 'store', 'edit', 'update'])->names('admin.sub-categories');
-    Route::resource('/admin/delivery-partners', AdminDeliveryPartnerController::class)->only(['index', 'store', 'edit', 'update'])->names('admin.delivery-partners');
+    Route::resource('/admin/delivery-partners', AdminDeliveryPartnerController::class)->only(['index', 'create', 'store', 'edit', 'update'])->names('admin.delivery-partners');
     Route::get('/admin/orders/{id}/edit', [AdminOrderController::class, 'edit'])->whereNumber('id')->name('admin.orders.edit');
     Route::put('/admin/orders/{id}', [AdminOrderController::class, 'modify'])->whereNumber('id')->name('admin.orders.modify');
     Route::get('/admin/orders', [AdminOrderController::class, 'index'])->name('admin.orders.index');

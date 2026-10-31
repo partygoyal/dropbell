@@ -51,6 +51,17 @@ class DeliveryAreaTest extends TestCase
         $this->postJson('/admin/delivery-areas', array_replace($input, ['postal_code' => '123', 'fee' => '-1', 'free_above' => '50']))->assertUnprocessable()->assertJsonValidationErrors(['postal_code', 'fee', 'free_above']);
     }
 
+    public function test_area_list_and_add_form_have_separate_admin_pages(): void
+    {
+        $this->get('/admin/delivery-areas/create')->assertRedirect('/admin/login');
+        $this->actingAs(User::factory()->create())->get('/admin/delivery-areas/create')->assertForbidden();
+        $this->actingAs(User::factory()->create(['is_admin' => true]));
+        $this->area();
+        $this->get('/admin/delivery-areas')->assertOk()->assertSee('Central')->assertSee(route('admin.delivery-areas.create'))->assertDontSee('name="postal_code"', false);
+        $this->get('/admin/delivery-areas/create')->assertOk()->assertSee('name="postal_code"', false)->assertSee('Cancel');
+        $this->from('/admin/delivery-areas/create')->post('/admin/delivery-areas', [])->assertRedirect('/admin/delivery-areas/create')->assertSessionHasErrors('name');
+    }
+
     public function test_legacy_rules_remain_available_for_pre_master_orders(): void
     {
         $this->area();
