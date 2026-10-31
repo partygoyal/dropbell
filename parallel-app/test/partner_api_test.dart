@@ -381,6 +381,14 @@ void main() {
         baseUrl: 'https://example.test/api',
         store: MemoryTokens(),
         client: MockClient((request) async {
+          if (request.url.path.endsWith('/notifications')) {
+            return jsonResponse({
+              'latest_id': 0,
+              'cursor': 0,
+              'data': [],
+              'next_page': null,
+            });
+          }
           if (request.url.path.endsWith('/me')) {
             return jsonResponse({
               'data': {
@@ -448,6 +456,14 @@ void main() {
         baseUrl: 'https://example.test/api',
         store: MemoryTokens(),
         client: MockClient((request) async {
+          if (request.url.path.endsWith('/notifications')) {
+            return jsonResponse({
+              'latest_id': 0,
+              'cursor': 0,
+              'data': [],
+              'next_page': null,
+            });
+          }
           if (request.url.path.endsWith('/me')) {
             return jsonResponse({
               'data': {

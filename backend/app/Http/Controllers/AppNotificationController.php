@@ -19,14 +19,21 @@ class AppNotificationController extends Controller
     public function index(Request $request): JsonResponse
     {
         [$type, $id] = $this->owner($request);
-        $request->validate(['page' => 'sometimes|integer|min:1']);
+        $request->validate(['page' => 'sometimes|integer|min:1', 'after' => 'sometimes|integer|min:0']);
         $query = DB::table('app_notifications')->where('owner_type', $type)->where('owner_id', $id);
         $unread = (clone $query)->whereNull('read_at')->count();
-        $rows = $query->orderByDesc('id')->paginate(30);
+        $latestId = (int) (clone $query)->max('id');
+        if ($request->has('after')) {
+            $query->where('id', '>', $request->integer('after'));
+            if ($type === 'partner') {
+                $query->where(fn ($events) => $events->where('event_type', 'not like', 'assigned:%')->orWhereExists(fn ($orders) => $orders->selectRaw('1')->from('orders')->whereColumn('orders.id', 'app_notifications.order_id')->where('delivery_partner_id', $id)->whereIn('status', ['received', 'picking', 'out_for_delivery'])));
+            }
+        }
+        $rows = $request->has('after') ? $query->orderBy('id')->paginate(100) : $query->orderByDesc('id')->paginate(30);
 
         return response()->json(['data' => $rows->getCollection()->map(function ($row) {
-            return ['id' => $row->id, 'title' => $row->title, 'body' => $row->body, 'order_reference' => $row->order_id ? DB::table('orders')->where('id', $row->order_id)->value('reference') : null, 'read' => $row->read_at !== null, 'created_at' => $row->created_at];
-        }), 'unread_count' => $unread, 'next_page' => $rows->hasMorePages() ? $rows->currentPage() + 1 : null])->header('Cache-Control', 'private, no-store');
+            return ['id' => $row->id, 'event_type' => $row->event_type, 'title' => $row->title, 'body' => $row->body, 'order_reference' => $row->order_id ? DB::table('orders')->where('id', $row->order_id)->value('reference') : null, 'read' => $row->read_at !== null, 'created_at' => $row->created_at];
+        }), 'latest_id' => $latestId, 'cursor' => $rows->getCollection()->last()?->id ?? $request->integer('after'), 'unread_count' => $unread, 'next_page' => $rows->hasMorePages() ? $rows->currentPage() + 1 : null])->header('Cache-Control', 'private, no-store');
     }
 
     public function read(Request $request, int $id): JsonResponse

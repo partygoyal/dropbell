@@ -45,6 +45,7 @@ class MobileNotifications {
     required this.signedIn,
     required this.openOrder,
     required this.foreground,
+    this.onEvent,
   });
   final String audience;
   final NotificationRequest request;
@@ -53,6 +54,7 @@ class MobileNotifications {
   final bool Function() signedIn;
   final Future<void> Function(String reference) openOrder;
   final void Function(String message) foreground;
+  final void Function(Map<String, dynamic> data)? onEvent;
   final List<StreamSubscription<dynamic>> subscriptions = [];
   bool ready = false;
   bool disposed = false;
@@ -81,15 +83,17 @@ class MobileNotifications {
       await messaging.setForegroundNotificationPresentationOptions(
         alert: false,
         badge: true,
-        sound: true,
+        sound: audience != 'partner',
       );
       if (disposed) return;
       subscriptions.add(
         FirebaseMessaging.onMessage.listen((message) {
-          if (signedIn() && message.data['audience'] == audience && !disposed)
+          if (signedIn() && message.data['audience'] == audience && !disposed) {
+            onEvent?.call(message.data);
             foreground(
               message.notification?.title ?? 'You have an order update.',
             );
+          }
         }),
       );
       subscriptions.add(

@@ -67,6 +67,37 @@ class AppNotificationTest extends TestCase
         $this->assertDatabaseCount('app_notifications', 1);
     }
 
+    public function test_notification_cursor_returns_only_new_owned_events_with_event_types(): void
+    {
+        $owner = $this->customer();
+        $order = $this->order($owner);
+        AppNotifications::status($order);
+        $first = DB::table('app_notifications')->max('id');
+        $order->revision++;
+        AppNotifications::status($order);
+        $second = DB::table('app_notifications')->max('id');
+        $this->getJson('/api/customer/notifications')->assertJsonPath('latest_id', $second);
+        $this->getJson('/api/customer/notifications?after='.$first)->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('cursor', $second)->assertJsonPath('data.0.event_type', 'status:received:1');
+        $this->getJson('/api/customer/notifications?after='.$second)->assertJsonCount(0, 'data')->assertJsonPath('cursor', $second);
+        $this->getJson('/api/customer/notifications?after=-1')->assertUnprocessable();
+    }
+
+    public function test_assignment_push_uses_partner_ringtone_for_android_and_ios(): void
+    {
+        $this->credentials();
+        Http::fake(['https://oauth2.googleapis.com/token' => Http::response(['access_token' => 'access-test']), 'https://fcm.googleapis.com/v1/projects/dropbell-test/messages:send' => Http::response(['name' => 'sent'])]);
+        $order = $this->order(User::factory()->create());
+        $partner = DB::table('delivery_partners')->insertGetId(['name' => 'Rider', 'phone' => '9234567890', 'active' => true]);
+        DB::table('delivery_partner_kycs')->insert(['delivery_partner_id' => $partner, 'status' => 'approved']);
+        $session = DB::table('partner_tokens')->insertGetId(['delivery_partner_id' => $partner, 'phone' => '9234567890', 'token_hash' => hash('sha256', 'assignment-token'), 'expires_at' => now()->addDay()]);
+        DB::table('app_devices')->insert(['installation_id' => (string) Str::uuid(), 'owner_type' => 'partner', 'owner_id' => $partner, 'session_id' => $session, 'platform' => 'android', 'token' => Crypt::encryptString('partner-push-token'), 'token_hash' => hash('sha256', 'partner-push-token')]);
+        DB::table('orders')->where('id', $order->id)->update(['delivery_partner_id' => $partner]);
+        $order->delivery_partner_id = $partner;
+        AppNotifications::assignment($order);
+        $this->assertSame(1, AppNotifications::deliver());
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'fcm.googleapis.com') && $request['message']['android']['notification']['channel_id'] === 'dropbell_assignments_v1' && $request['message']['apns']['payload']['aps']['sound'] === 'partner_assignment.wav' && str_starts_with($request['message']['data']['event_type'], 'assigned:'));
+    }
+
     public function test_device_registration_encrypts_tokens_and_logout_removes_device(): void
     {
         $this->customer();

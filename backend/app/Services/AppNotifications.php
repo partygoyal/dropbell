@@ -119,12 +119,17 @@ class AppNotifications
             }
             try {
                 $order = $notification->order_id ? DB::table('orders')->find($notification->order_id) : null;
-                if ($notification->read_at !== null || ($device->owner_type === 'partner' && str_starts_with($notification->event_type, 'assigned:') && (int) $order?->delivery_partner_id !== $device->owner_id)) {
+                if ($notification->read_at !== null || ($device->owner_type === 'partner' && str_starts_with($notification->event_type, 'assigned:') && ((int) $order?->delivery_partner_id !== $device->owner_id || ! in_array($order?->status, ['received', 'picking', 'out_for_delivery'], true)))) {
                     DB::table('app_notification_deliveries')->where('id', $id)->update(['status' => 'cancelled', 'lease_until' => null, 'updated_at' => now()]);
 
                     continue;
                 }
-                $message = ['token' => Crypt::decryptString($device->token), 'notification' => ['title' => $notification->title, 'body' => $notification->body], 'data' => ['notification_id' => (string) $notification->id, 'order_reference' => $order?->reference ?? '', 'audience' => $device->owner_type], 'android' => ['ttl' => '21600s', 'collapse_key' => 'notification-'.$notification->id], 'apns' => ['headers' => ['apns-collapse-id' => 'notification-'.$notification->id]]];
+                $message = ['token' => Crypt::decryptString($device->token), 'notification' => ['title' => $notification->title, 'body' => $notification->body], 'data' => ['notification_id' => (string) $notification->id, 'order_reference' => $order?->reference ?? '', 'audience' => $device->owner_type, 'event_type' => $notification->event_type], 'android' => ['ttl' => '21600s', 'collapse_key' => 'notification-'.$notification->id], 'apns' => ['headers' => ['apns-collapse-id' => 'notification-'.$notification->id]]];
+                if ($device->owner_type === 'partner' && str_starts_with($notification->event_type, 'assigned:')) {
+                    $message['android']['priority'] = 'high';
+                    $message['android']['notification'] = ['channel_id' => 'dropbell_assignments_v1', 'sound' => 'partner_assignment'];
+                    $message['apns']['payload']['aps']['sound'] = 'partner_assignment.wav';
+                }
                 $response = Http::timeout(15)->withToken(self::accessToken($credentials))->post('https://fcm.googleapis.com/v1/projects/'.rawurlencode($credentials['project_id']).'/messages:send', ['message' => $message]);
                 if (! $response->successful()) {
                     $unregistered = collect($response->json('error.details') ?? [])->contains(fn ($detail) => ($detail['errorCode'] ?? null) === 'UNREGISTERED');

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Marketplace;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -11,6 +12,18 @@ use Illuminate\Validation\ValidationException;
 
 class VendorPortalController extends Controller
 {
+    public function orderAlerts(Request $request): JsonResponse
+    {
+        $input = $request->validate(['after' => 'sometimes|integer|min:0']);
+        $query = DB::table('orders')->where('is_sample', false)->whereExists(fn ($items) => $items->selectRaw('1')->from('order_items')->whereColumn('order_items.order_id', 'orders.id')->where('vendor_id', $request->attributes->get('vendor')->id));
+        if (! array_key_exists('after', $input)) {
+            return response()->json(['cursor' => (int) $query->max('orders.id'), 'orders' => []])->header('Cache-Control', 'private, no-store');
+        }
+        $orders = $query->where('orders.id', '>', $input['after'])->orderBy('orders.id')->limit(100)->get(['orders.id', 'orders.reference', 'orders.status']);
+
+        return response()->json(['cursor' => $orders->last()?->id ?? (int) $input['after'], 'orders' => $orders->where('status', '!=', 'cancelled')->values()])->header('Cache-Control', 'private, no-store');
+    }
+
     public function dashboard(Request $request): View
     {
         $vendor = $request->attributes->get('vendor');

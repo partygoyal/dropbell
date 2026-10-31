@@ -29,6 +29,7 @@ Route::post('/vendor/login', [VendorAuthController::class, 'login'])->middleware
 Route::get('/vendor/register', [VendorAuthController::class, 'registerForm'])->name('vendor.register');
 Route::post('/vendor/register', [VendorAuthController::class, 'register'])->middleware('throttle:5,1');
 Route::middleware(EnsureVendor::class)->group(function () {
+    Route::get('/vendor/order-alerts', [VendorPortalController::class, 'orderAlerts'])->name('vendor.order-alerts');
     Route::get('/vendor', [VendorPortalController::class, 'dashboard'])->name('vendor.dashboard');
     Route::get('/vendor/onboarding', [VendorPortalController::class, 'onboarding'])->name('vendor.onboarding');
     Route::put('/vendor/onboarding', [VendorPortalController::class, 'saveOnboarding'])->name('vendor.onboarding.save');

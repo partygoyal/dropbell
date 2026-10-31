@@ -1,3 +1,4 @@
+import 'assignment_alerts.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -320,7 +321,13 @@ class RiderHome extends StatefulWidget {
 }
 
 class _RiderHomeState extends State<RiderHome> with WidgetsBindingObserver {
+  late final assignmentAlerts = AssignmentAlerts(
+    request: (path) => widget.api.request('GET', path),
+  );
   late final notifications = MobileNotifications(
+    onEvent: (event) {
+      if (foreground) unawaited(assignmentAlerts.accept(event));
+    },
     audience: 'partner',
     request: widget.api.request,
     readStorage: (key) =>
@@ -379,6 +386,7 @@ class _RiderHomeState extends State<RiderHome> with WidgetsBindingObserver {
   bool busy = false;
   bool foreground = true;
   Timer? refreshTimer;
+  Timer? alertTimer;
   DateTime? refreshedAt;
   String? error;
   String get scope => tab == 1 ? 'history' : 'active';
@@ -388,6 +396,12 @@ class _RiderHomeState extends State<RiderHome> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     unawaited(notifications.resume().catchError((_) {}));
     refresh();
+    unawaited(assignmentAlerts.poll());
+    alertTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted && foreground && widget.api.signedIn) {
+        unawaited(assignmentAlerts.poll());
+      }
+    });
     refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted &&
           foreground &&
@@ -402,6 +416,8 @@ class _RiderHomeState extends State<RiderHome> with WidgetsBindingObserver {
   @override
   void dispose() {
     refreshTimer?.cancel();
+    alertTimer?.cancel();
+    assignmentAlerts.dispose();
     unawaited(notifications.dispose());
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -410,6 +426,7 @@ class _RiderHomeState extends State<RiderHome> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     foreground = state == AppLifecycleState.resumed;
+    if (foreground) unawaited(assignmentAlerts.poll(baseline: true));
     if (foreground && !busy && (ModalRoute.of(context)?.isCurrent ?? false)) {
       refresh();
     }
