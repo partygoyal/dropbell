@@ -58,6 +58,7 @@ Route::middleware(EnsureAdmin::class)->group(function () {
     Route::get('/admin/customers/{id}', [AdminCustomerController::class, 'show'])->whereNumber('id')->name('admin.customers.show');
     Route::get('/admin/delivery-partners/{id}/kyc', [AdminPartnerKycController::class, 'show'])->whereNumber('id')->name('admin.partner-kyc.show');
     Route::post('/admin/delivery-partners/{id}/kyc', [AdminPartnerKycController::class, 'store'])->whereNumber('id')->name('admin.partner-kyc.store');
+    Route::post('/admin/delivery-partners/{id}/kyc/approve-without-documents', [AdminPartnerKycController::class, 'approveWithoutDocuments'])->whereNumber('id')->name('admin.partner-kyc.approve-without-documents');
     Route::patch('/admin/delivery-partners/{id}/kyc/review', [AdminPartnerKycController::class, 'review'])->whereNumber('id')->name('admin.partner-kyc.review');
     Route::get('/admin/delivery-partners/{id}/kyc/documents/{kind}', [AdminPartnerKycController::class, 'document'])->whereNumber('id')->whereIn('kind', ['identity', 'address', 'licence'])->name('admin.partner-kyc.document');
     Route::resource('/admin/delivery-areas', AdminDeliveryAreaController::class)->only(['index', 'store', 'edit', 'update'])->names('admin.delivery-areas');

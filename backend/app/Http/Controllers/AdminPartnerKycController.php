@@ -88,6 +88,35 @@ class AdminPartnerKycController extends Controller
         return redirect()->route('admin.partner-kyc.show', $id)->with('status', 'KYC '.$input['status'].'.');
     }
 
+    public function approveWithoutDocuments(Request $request, int $id): RedirectResponse
+    {
+        $input = $request->validate(['revision' => 'required|integer|min:0']);
+        DB::transaction(function () use ($request, $id, $input) {
+            abort_unless(DB::table('delivery_partners')->where('id', $id)->lockForUpdate()->first(), 404);
+            $kyc = DB::table('delivery_partner_kycs')->where('delivery_partner_id', $id)->lockForUpdate()->first();
+            if ((int) $input['revision'] !== ($kyc?->revision ?? 0)) {
+                throw ValidationException::withMessages(['revision' => 'Partner approval changed. Reload the page before approving.']);
+            }
+            if ($kyc?->status === 'approved') {
+                throw ValidationException::withMessages(['review' => 'This partner is already approved.']);
+            }
+            $revision = ($kyc?->revision ?? 0) + 1;
+            $note = 'Approved by admin without requiring KYC details or document verification.';
+            DB::table('delivery_partner_kycs')->updateOrInsert(['delivery_partner_id' => $id], [
+                'status' => 'approved', 'revision' => $revision,
+                'reviewed_by' => $request->user()->id, 'reviewed_at' => now(), 'review_note' => $note,
+                'created_at' => $kyc?->created_at ?? now(), 'updated_at' => now(),
+            ]);
+            DB::table('partner_kyc_events')->insert([
+                'delivery_partner_id' => $id, 'admin_id' => $request->user()->id,
+                'action' => 'Admin approval without documents', 'note' => $note,
+                'revision' => $revision, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        });
+
+        return redirect()->route('admin.partner-kyc.show', $id)->with('status', 'Partner approved without KYC documents.');
+    }
+
     public function document(int $id, string $kind): StreamedResponse
     {
         abort_unless(in_array($kind, ['identity', 'address', 'licence'], true), 404);
@@ -96,6 +125,6 @@ class AdminPartnerKycController extends Controller
         $path = $kyc->{$kind.'_path'};
         abort_unless($path && Storage::disk('kyc')->exists($path), 404);
 
-        return Storage::disk('kyc')->download($path,'partner-'.$id.'-'.$kind.'.'.pathinfo($path,PATHINFO_EXTENSION),['Cache-Control' => 'private, no-store, max-age=0', 'X-Content-Type-Options' => 'nosniff']);
+        return Storage::disk('kyc')->download($path, 'partner-'.$id.'-'.$kind.'.'.pathinfo($path, PATHINFO_EXTENSION), ['Cache-Control' => 'private, no-store, max-age=0', 'X-Content-Type-Options' => 'nosniff']);
     }
 }

@@ -50,6 +50,39 @@ class PartnerKycTest extends TestCase
         $this->patch('/admin/delivery-partners/'.$id.'/kyc/review', [])->assertForbidden();
     }
 
+    public function test_admin_can_approve_without_any_details_or_documents_and_duplicate_approval_is_rejected(): void
+    {
+        $this->admin();
+        $id = $this->partner();
+        $url = '/admin/delivery-partners/'.$id.'/kyc/approve-without-documents';
+        $this->get('/admin/delivery-partners/'.$id.'/kyc')->assertOk()->assertSee('Approve partner without documents');
+        $this->post($url, ['revision' => 0])->assertRedirect('/admin/delivery-partners/'.$id.'/kyc');
+        $this->assertDatabaseHas('delivery_partner_kycs', ['delivery_partner_id' => $id, 'status' => 'approved', 'revision' => 1, 'identity_path' => null, 'address_path' => null, 'legal_name' => null, 'reviewed_by' => auth()->id()]);
+        $this->assertDatabaseHas('partner_kyc_events', ['delivery_partner_id' => $id, 'action' => 'Admin approval without documents']);
+        $this->get('/admin/delivery-partners/'.$id.'/kyc')->assertOk()->assertSee('without requiring KYC details')->assertDontSee('Approve partner without documents');
+        $this->postJson($url, ['revision' => 0])->assertUnprocessable();
+        $this->postJson($url, ['revision' => 1])->assertUnprocessable();
+        $this->assertDatabaseCount('partner_kyc_events', 1);
+        $this->postJson('/admin/delivery-partners/999/kyc/approve-without-documents', ['revision' => 0])->assertNotFound();
+    }
+
+    public function test_document_free_approval_is_admin_only_and_preserves_existing_submission(): void
+    {
+        $id = $this->partner();
+        $url = '/admin/delivery-partners/'.$id.'/kyc/approve-without-documents';
+        $this->post($url, ['revision' => 0])->assertRedirect('/admin/login');
+        $this->actingAs(User::factory()->create());
+        $this->post($url, ['revision' => 0])->assertForbidden();
+        $this->admin();
+        $this->submit($id);
+        $this->postJson($url, ['revision' => 0])->assertUnprocessable();
+        $this->post($url, ['revision' => 1])->assertRedirect();
+        $kyc = DB::table('delivery_partner_kycs')->first();
+        $this->assertSame('approved', $kyc->status);
+        $this->assertSame('Asha Kumar', $kyc->legal_name);
+        Storage::disk('kyc')->assertExists([$kyc->identity_path, $kyc->address_path]);
+    }
+
     public function test_partner_kyc_is_stored_privately_and_can_be_reviewed_and_downloaded(): void
     {
         $this->admin();
@@ -140,8 +173,7 @@ class PartnerKycTest extends TestCase
         $edit = ['revision' => 0, 'address' => $address, 'quantities' => [$itemId => 1], 'delivery_preference' => 'standard', 'delivery_partner_id' => $id, 'reason' => 'Assign rider'];
         $this->putJson('/admin/orders/'.$orderId, $edit)->assertUnprocessable()->assertJsonValidationErrors('delivery_partner_id');
         $this->patchJson('/admin/orders/'.$orderId, ['status' => 'out_for_delivery', 'revision' => DB::table('orders')->where('id', $orderId)->value('revision'), 'reason' => 'Customer requested cancellation'])->assertUnprocessable();
-        $this->submit($id);
-        $this->patch('/admin/delivery-partners/'.$id.'/kyc/review', ['revision' => 1, 'status' => 'approved'])->assertRedirect();
+        $this->post('/admin/delivery-partners/'.$id.'/kyc/approve-without-documents', ['revision' => 0])->assertRedirect();
         $this->put('/admin/orders/'.$orderId, $edit)->assertRedirect('/admin/orders/'.$orderId);
         DB::table('delivery_partners')->where('id', $id)->update(['active' => false]);
         $this->patchJson('/admin/orders/'.$orderId, ['status' => 'out_for_delivery', 'revision' => DB::table('orders')->where('id', $orderId)->value('revision'), 'reason' => 'Customer requested cancellation'])->assertUnprocessable();
