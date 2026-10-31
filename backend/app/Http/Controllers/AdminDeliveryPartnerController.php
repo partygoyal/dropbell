@@ -6,7 +6,9 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class AdminDeliveryPartnerController extends Controller
 {
@@ -35,12 +37,27 @@ class AdminDeliveryPartnerController extends Controller
 
     private function persist(Request $request, ?int $id = null): RedirectResponse
     {
-        $input = $request->validate(['name' => 'required|string|max:120', 'phone' => ['required', 'regex:/^[6-9]\d{9}$/', Rule::unique('delivery_partners')->ignore($id)], 'vehicle' => 'nullable|string|max:120', 'active' => 'required|boolean']);
-        DB::transaction(function () use ($id, $input, $request) {
+        $input = $request->validate(['name' => 'required|string|max:120', 'phone' => ['required', 'regex:/^[6-9]\d{9}$/', Rule::unique('delivery_partners')->ignore($id)], 'vehicle' => 'nullable|string|max:120', 'active' => 'required|boolean', 'password' => 'nullable|string|min:12|max:72|confirmed']);
+        if (! empty($input['password']) && strlen($input['password']) > 72) {
+            throw ValidationException::withMessages(['password' => 'Please choose a shorter app password.']);
+        }
+        $passwordChanged = ! empty($input['password']);
+        if ($passwordChanged) {
+            $input['password'] = Hash::make($input['password']);
+        } else {
+            unset($input['password']);
+        }
+        DB::transaction(function () use ($id, $input, $request, $passwordChanged) {
             if ($id) {
                 $partner = DB::table('delivery_partners')->where('id', $id)->lockForUpdate()->first();
                 abort_unless($partner, 404);
                 DB::table('delivery_partners')->where('id', $id)->update($input + ['updated_at' => now()]);
+                if ($passwordChanged || ! $input['active'] || $partner->name !== $input['name'] || $partner->phone !== $input['phone']) {
+                    DB::table('partner_tokens')->where('delivery_partner_id', $id)->delete();
+                    DB::table('partner_otps')->where('delivery_partner_id', $id)->delete();
+                    DB::table('app_devices')->where('owner_type', 'partner')->where('owner_id', $id)->delete();
+                    DB::table('delivery_partners')->where('id', $id)->update(['is_online' => false]);
+                }
                 if ($partner->name !== $input['name'] || $partner->phone !== $input['phone']) {
                     $kyc = DB::table('delivery_partner_kycs')->where('delivery_partner_id', $id)->lockForUpdate()->first();
                     if ($kyc) {

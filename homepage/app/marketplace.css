@@ -330,3 +330,15 @@ footer.market-footer { display: block; padding: 21px max(3.5%, calc((100vw - 136
 .product .product-bottom { flex-wrap: wrap; gap: 8px; }
 .product .add { white-space: nowrap; }
 .stepper button:disabled { opacity: .4; cursor: not-allowed; }
+
+.shop-page { padding: 28px 0 56px; }
+.shop-page > h1, .shop-heading h1 { font-size: clamp(28px, 4vw, 44px); margin: 12px 0; }
+.shop-page > p, .shop-heading > p { color: #526580; line-height: 1.6; }
+.shop-page .market-store-grid { margin-top: 28px; }
+.shop-empty { padding: 24px; border: 1px solid #dce5f0; border-radius: 12px; background: #f7faff; margin: 20px 0; }
+.shop-empty p { color: #526580; line-height: 1.7; }
+.shop-context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 15px 20px; margin: 16px 0; background: #eaf3ff; color: #173955; border-radius: 10px; font-size: 13px; }
+.shop-context button { color: #0055e8; background: white; padding: 10px 14px; border: 1px solid #c2d8fb; border-radius: 8px; cursor: pointer; }
+.shop-search { display: flex; flex-direction: column; gap: 9px; max-width: 480px; margin: 24px 0; font-size: 13px; }
+.shop-search input { padding: 13px; border: 1px solid #cbd8e6; border-radius: 9px; color: #15324d; font: inherit; }
+.shop-page .market-store-card b { overflow-wrap: anywhere; }

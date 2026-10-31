@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\ServiceLocations;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,34 @@ use Illuminate\Support\Str;
 
 class CustomerController extends Controller
 {
+    public function login(Request $request): JsonResponse
+    {
+        $input = $request->validate(['email' => 'required|email|max:255', 'password' => 'required|string|max:255']);
+        $user = User::where('email', mb_strtolower(trim($input['email'])))->first();
+        if (! $user || ! Hash::check($input['password'], $user->password) || $user->is_admin || $user->is_vendor || $user->is_sample_guest) {
+            return response()->json(['message' => 'The email or password is incorrect.'], 422);
+        }
+
+        return $this->session($user);
+    }
+
+    public function register(Request $request): JsonResponse
+    {
+        $request->merge(['email' => mb_strtolower(trim((string) $request->input('email')))]);
+        $input = $request->validate(['name' => 'required|string|max:60', 'email' => 'required|email|max:255|unique:users,email', 'phone' => ['required', 'regex:/^[6-9]\d{9}$/', 'unique:users,phone'], 'password' => 'required|string|min:8|max:255|confirmed']);
+        $user = User::create(collect($input)->only(['name', 'email', 'phone', 'password'])->all());
+
+        return $this->session($user);
+    }
+
+    private function session(User $user): JsonResponse
+    {
+        $token = bin2hex(random_bytes(32));
+        DB::table('customer_tokens')->insert(['user_id' => $user->id, 'token_hash' => hash('sha256', $token), 'expires_at' => now()->addDays(7), 'created_at' => now(), 'updated_at' => now()]);
+
+        return response()->json(['token' => $token]);
+    }
+
     public function requestOtp(Request $request): JsonResponse
     {
         $input = $request->validate(['phone' => ['required', 'regex:/^[6-9]\d{9}$/']]);
@@ -85,9 +114,9 @@ class CustomerController extends Controller
     public function profile(Request $request): JsonResponse
     {
         $user = $request->user();
-        $addresses = DB::table('addresses')->where('user_id', $user->id)->orderByDesc('is_default')->get()->map(fn ($item) => ['id' => (string) $item->id, 'label' => $item->label, 'name' => $item->name, 'phone' => $item->phone, 'street' => $item->street, 'city' => $item->city, 'pin' => $item->postal_code, 'isDefault' => (bool) $item->is_default]);
+        $addresses = DB::table('addresses')->where('user_id', $user->id)->orderByDesc('is_default')->get()->map(fn ($item) => ['locality_id' => $item->locality_id, 'state_id' => $item->locality_id ? DB::table('service_cities')->where('id', DB::table('service_localities')->where('id', $item->locality_id)->value('city_id'))->value('state_id') : null, 'city_id' => $item->locality_id ? DB::table('service_localities')->where('id', $item->locality_id)->value('city_id') : null, 'locality' => $item->locality_id ? DB::table('service_localities')->where('id', $item->locality_id)->value('name') : null, 'id' => (string) $item->id, 'label' => $item->label, 'name' => $item->name, 'phone' => $item->phone, 'street' => $item->street, 'city' => $item->city, 'pin' => $item->postal_code, 'isDefault' => (bool) $item->is_default, 'latitude' => $item->latitude === null ? null : (float) $item->latitude, 'longitude' => $item->longitude === null ? null : (float) $item->longitude]);
 
-        return response()->json(['data' => ['isDemo' => (bool) $user->is_sample_guest, 'name' => $user->name, 'phone' => $user->phone, 'addresses' => $addresses]]);
+        return response()->json(['data' => ['email' => $user->email, 'isDemo' => (bool) $user->is_sample_guest, 'name' => $user->name, 'phone' => $user->phone, 'addresses' => $addresses]]);
     }
 
     public function updateProfile(Request $request): JsonResponse
@@ -100,7 +129,8 @@ class CustomerController extends Controller
 
     public function saveAddress(Request $request, ?int $id = null): JsonResponse
     {
-        $input = $request->validate(['label' => 'required|in:Home,Work,Other', 'name' => 'required|string|max:120', 'phone' => ['required', 'regex:/^[6-9]\d{9}$/'], 'street' => 'required|string|max:255', 'city' => 'required|string|max:120', 'pin' => ['required', 'regex:/^[1-9]\d{5}$/'], 'isDefault' => 'sometimes|boolean']);
+        $input = $request->validate(['label' => 'required|in:Home,Work,Other', 'name' => 'required|string|max:120', 'phone' => ['required', 'regex:/^[6-9]\d{9}$/'], 'street' => 'required|string|max:255', 'locality_id' => 'required|integer', 'state_id' => 'sometimes|integer', 'city_id' => 'sometimes|integer', 'city' => 'nullable|string|max:120', 'pin' => ['nullable', 'regex:/^[1-9]\d{5}$/'], 'isDefault' => 'sometimes|boolean', 'latitude' => 'nullable|required_with:longitude|numeric|between:-90,90', 'longitude' => 'nullable|required_with:latitude|numeric|between:-180,180']);
+        $input = ServiceLocations::address($input);
         DB::transaction(function () use ($request, $input, $id) {
             DB::table('users')->where('id', $request->user()->id)->lockForUpdate()->first();
             $query = DB::table('addresses')->where('user_id', $request->user()->id);
@@ -112,7 +142,7 @@ class CustomerController extends Controller
             if ($default) {
                 (clone $query)->update(['is_default' => false]);
             }
-            $row = collect($input)->only(['label', 'name', 'phone', 'street', 'city'])->all() + ['postal_code' => $input['pin'], 'is_default' => $default, 'updated_at' => now()];
+            $row = collect($input)->only(['label', 'name', 'phone', 'street', 'city', 'locality_id', 'latitude', 'longitude'])->all() + ['postal_code' => $input['pin'], 'is_default' => $default, 'updated_at' => now()];
             if ($id) {
                 (clone $query)->where('id', $id)->update($row);
             } else {
@@ -144,6 +174,7 @@ class CustomerController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
+        DB::table('app_devices')->where('owner_type', 'customer')->where('session_id', $request->attributes->get('customer_token_id'))->delete();
         DB::table('customer_tokens')->where('id', $request->attributes->get('customer_token_id'))->delete();
 
         return response()->json(['message' => 'Signed out.']);

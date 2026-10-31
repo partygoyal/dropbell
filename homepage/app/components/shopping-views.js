@@ -23,7 +23,7 @@ function ProductArt({ product, large = false }) {
   return product.photo ? <img src={image(product.photo, large ? 1000 : 500)} alt={product.name} loading={large ? 'eager' : 'lazy'} /> : <span className="emoji" role="img" aria-label={product.name}>{product.emoji}</span>;
 }
 
-function ProductCard({ product, Quantity }) {
+export function ProductCard({ product, Quantity }) {
   return <article className="product"><Link href={`/product/${product.id}`} className="product-photo" aria-label={`View ${product.name}`}><ProductArt product={product} />{product.badge && <span className="badge">{product.badge}</span>}</Link><div className="product-body"><small>{titles[product.cat] || product.cat}</small><h3><Link href={`/product/${product.id}`}>{product.name}</Link></h3><p className="quantity">{product.qty}</p><p className="product-stock">{product.sample ? `Sample price · ${product.inventory} sample packs` : product.inventory == null ? 'Stock confirmed at checkout' : `${product.inventory} packs available`}</p><div className="product-bottom"><strong>₹{product.price}</strong><Quantity product={product} /></div></div></article>;
 }
 

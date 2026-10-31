@@ -20,7 +20,7 @@ class CatalogueInventoryTest extends TestCase
         $this->withToken('inventory-token');
         DB::table('delivery_areas')->insert(['name' => 'Test area', 'postal_code' => '248001', 'fee_paise' => 0, 'minimum_paise' => 0, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
 
-        return ['request_key' => (string) Str::uuid(), 'items' => [['id' => $productId, 'quantity' => $quantity]], 'address' => ['name' => 'Customer', 'phone' => '9876543210', 'street' => '12 Road', 'city' => 'Dehradun', 'pin' => '248001'], 'delivery' => 'standard', 'payment' => 'cod', 'expected_total' => 6000 * $quantity];
+        return ['request_key' => (string) Str::uuid(), 'items' => [['id' => $productId, 'quantity' => $quantity]], 'address' => ['locality_id' => $this->serviceLocality('248001'), 'name' => 'Customer', 'phone' => '9876543210', 'street' => '12 Road', 'city' => 'Dehradun', 'pin' => '248001'], 'delivery' => 'standard', 'payment' => 'cod', 'expected_total' => 6000 * $quantity];
     }
 
     private function stockedProduct(int $stock = 5): array
@@ -110,7 +110,7 @@ class CatalogueInventoryTest extends TestCase
         $this->putJson('/vendor/products/'.$id, ['revision' => 2, 'available' => 1, 'price' => '60', 'stock_quantity' => -1])->assertUnprocessable()->assertJsonValidationErrors('stock_quantity');
 
         $this->assertDatabaseHas('vendor_products', ['id' => $offerId, 'stock_quantity' => 8, 'revision' => 2]);
-        $this->get('/vendor/products')->assertOk()->assertSee('Stock (packs)');
+        $this->get('/vendor/products?category=Fresh')->assertOk()->assertSee('Stock (packs)');
         $this->actingAs(User::factory()->create(['is_admin' => true]))->get('/admin')->assertOk()->assertSee('1 orderable')->assertSee('Real vendor stock');
         $this->get('/admin/vendors/'.$vendor->id)->assertOk()->assertSee('Stock (packs)');
     }
@@ -146,9 +146,9 @@ class CatalogueInventoryTest extends TestCase
         DB::table('vendor_products')->where('id', $offer)->update(['stock_quantity' => 3]);
 
         $this->getJson('/api/products/'.$id.'?postal_code=248001')->assertOk()->assertJsonPath('data.is_sample', false)->assertJsonPath('data.available', true)->assertJsonPath('data.price_paise', 9000)->assertJsonPath('data.stock_quantity', 3);
-        $this->getJson('/api/products/'.$id.'?postal_code=248002')->assertOk()->assertJsonPath('data.is_sample', true)->assertJsonPath('data.available', false);
+        $this->getJson('/api/products/'.$id.'?postal_code=248002')->assertNotFound();
         DB::table('vendor_products')->where('id', $offer)->update(['stock_quantity' => 0]);
-        $this->getJson('/api/products/'.$id.'?postal_code=248001')->assertOk()->assertJsonPath('data.is_sample', true)->assertJsonPath('data.available', false);
+        $this->getJson('/api/products/'.$id.'?postal_code=248001')->assertNotFound();
     }
 
     public function test_admin_can_edit_sample_price_and_quantity_without_changing_vendor_stock(): void

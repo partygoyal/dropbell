@@ -8,3 +8,12 @@
 **/.next/
 **/.openai/
 /backend/vendor/
+
+**/firebase-service-account*.json
+
+/builds/
+**/key.properties
+**/*.jks
+**/*.keystore
+**/google-services.json
+**/GoogleService-Info.plist

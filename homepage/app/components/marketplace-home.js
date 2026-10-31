@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ShopList } from './shop-browser';
 import { useRouter } from 'next/navigation';
 import { categoryImageStyle, subCategoryImageStyle } from '../lib/category-images';
 
@@ -42,16 +43,7 @@ const shoppingCategories = [
   { label: 'More', match: /^All$/, art: 'Personal Care & Hygiene' },
 ];
 
-const storeDepartments = [
-  { name: 'Fresh produce', caption: 'Vegetables & fruits', icon: 'leaf', color: 'green', category: 1 },
-  { name: 'Neighbourhood kirana', caption: 'Grocery & daily needs', icon: 'store', color: 'red', category: 0 },
-  { name: 'Sweets & treats', caption: 'Something to celebrate', icon: 'sweet', color: 'maroon', category: 3 },
-  { name: 'Dairy shops', caption: 'Fresh dairy essentials', icon: 'milk', color: 'cyan', category: 4 },
-  { name: 'Household stores', caption: 'Everyday home essentials', icon: 'cart', color: 'blue', category: 6 },
-  { name: 'Local bakeries', caption: 'Bread & breakfast', icon: 'bread', color: 'brown', category: 5 },
-];
-
-export default function MarketplaceHome({ managedCategories, subCategories, products, Quantity, chooseFilter }) {
+export default function MarketplaceHome({ managedCategories, subCategories, products, Quantity, chooseFilter, vendors = [], hasLocation, onChooseLocation, catalogueReady }) {
   const router = useRouter();
   const browse = item => {
     const parent = managedCategories.find(category => item.match.test(category.name))
@@ -73,7 +65,7 @@ export default function MarketplaceHome({ managedCategories, subCategories, prod
     <div className="market-content">
       <section className="market-categories" id="categories" aria-labelledby="market-categories-title"><div className="market-section-heading"><h2 id="market-categories-title">What would you like to order today?</h2><button onClick={() => chooseFilter('All')}>View All Categories <MarketIcon name="arrow" /></button></div><div className="market-category-grid">{shoppingCategories.map(item => <button key={item.label} className="market-category-card" onClick={() => browse(item)}><span className="market-category-frame"><span className="market-category-art" style={item.photo ? subCategoryImageStyle(item.art, item.photo) : categoryImageStyle(item.art)} aria-hidden="true" /></span><b>{item.label}</b></button>)}</div></section>
 
-      <section className="market-stores" id="stores" aria-labelledby="market-stores-title"><div className="market-section-heading"><div><h2 id="market-stores-title">Local stores. Everyday favourites.</h2><p>Discover the essentials your neighbourhood has to offer.</p></div><button onClick={() => chooseFilter('All')}>Explore All <MarketIcon name="arrow" /></button></div><div className="market-store-grid">{storeDepartments.map(store => <button key={store.name} className="market-store-card" onClick={() => browse(shoppingCategories[store.category])}><span className={`market-store-emblem ${store.color}`}><MarketIcon name={store.icon} /></span><b>{store.name}</b><span>{store.caption}</span><small>Explore category <MarketIcon name="arrow" /></small></button>)}</div></section>
+      <section className="market-stores" id="stores" aria-labelledby="market-stores-title"><div className="market-section-heading"><div><h2 id="market-stores-title">Local stores. Everyday favourites.</h2><p>Shop from vendors serving your delivery location.</p></div><Link href="/shops">Explore all shops →</Link></div><ShopList vendors={vendors.slice(0, 6)} hasLocation={hasLocation} onChooseLocation={onChooseLocation} ready={catalogueReady} /></section>
 
       <section className="market-promotions" id="offers" aria-label="Shop everyday essentials"><article className="market-promo market-promo-fresh"><div><h2>Fresh Vegetables<br />& Fruits</h2><p lang="hi">हर दिन ताज़ा, हर घर के लिए</p><button onClick={() => browse(shoppingCategories[1])}>Shop Now <MarketIcon name="arrow" /></button></div><div className="market-promo-art" style={categoryImageStyle('Fruits & Vegetables')} aria-hidden="true" /></article><article className="market-promo market-promo-grocery"><div><h2>Grocery & Daily Needs</h2><p lang="hi">आपकी रोज़मर्रा की सभी ज़रूरतें</p><button onClick={() => browse(shoppingCategories[0])}>Shop Now <MarketIcon name="arrow" /></button></div><div className="market-promo-art" style={categoryImageStyle('Atta, Rice & Pulses')} aria-hidden="true" /></article></section>
 

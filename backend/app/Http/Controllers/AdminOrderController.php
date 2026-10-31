@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AppNotifications;
 use App\Services\DeliveryPricing;
+use App\Services\DeliveryZones;
 use App\Services\Inventory;
 use App\Services\Marketplace;
 use App\Services\OrderAftercare;
+use App\Services\ServiceLocations;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -52,8 +55,9 @@ class AdminOrderController extends Controller
     {
         $order = DB::table('orders')->find($id);
         abort_unless($order, 404);
+        $partnerEvents = DB::table('partner_delivery_events')->join('delivery_partners', 'delivery_partners.id', '=', 'partner_delivery_events.delivery_partner_id')->where('order_id', $id)->select('partner_delivery_events.*', 'delivery_partners.name as partner_name')->latest('partner_delivery_events.id')->get();
 
-        return view('admin.orders.show', ['partners' => DB::table('delivery_partners')->where('active', true)->whereExists(fn ($kyc) => $kyc->selectRaw('1')->from('delivery_partner_kycs')->whereColumn('delivery_partner_kycs.delivery_partner_id', 'delivery_partners.id')->where('status', 'approved'))->orderBy('name')->get(), 'requests' => DB::table('customer_requests')->where('order_id', $id)->latest('id')->get(), 'order' => $order, 'items' => DB::table('order_items')->where('order_id', $id)->get(), 'address' => json_decode($order->delivery_address, true), 'partner' => $order->delivery_partner_id ? DB::table('delivery_partners')->find($order->delivery_partner_id) : null, 'events' => DB::table('order_events')->join('users', 'users.id', '=', 'order_events.admin_id')->where('order_id', $id)->select('order_events.*', 'users.name as admin_name')->latest('order_events.id')->get()]);
+        return view('admin.orders.show', ['partners' => ServiceLocations::eligible(DeliveryZones::eligible(DB::table('delivery_partners'), $order->delivery_zone_id), $order->locality_id)->where('active', true)->whereExists(fn ($kyc) => $kyc->selectRaw('1')->from('delivery_partner_kycs')->whereColumn('delivery_partner_kycs.delivery_partner_id', 'delivery_partners.id')->where('status', 'approved'))->orderBy('name')->get(), 'requests' => DB::table('customer_requests')->where('order_id', $id)->latest('id')->get(), 'order' => $order, 'items' => DB::table('order_items')->where('order_id', $id)->get(), 'address' => json_decode($order->delivery_address, true), 'partner' => $order->delivery_partner_id ? DB::table('delivery_partners')->find($order->delivery_partner_id) : null, 'events' => DB::table('order_events')->join('users', 'users.id', '=', 'order_events.admin_id')->where('order_id', $id)->select('order_events.*', 'users.name as admin_name')->latest('order_events.id')->get()])->with('partnerEvents', $partnerEvents);
     }
 
     public function edit(int $id): View
@@ -72,8 +76,8 @@ class AdminOrderController extends Controller
 
         return view('admin.orders.edit', [
             'order' => $order, 'address' => json_decode($order->delivery_address, true), 'areas' => DB::table('delivery_areas')->where('active', true)->get(),
-            'items' => $items, 'isMarketplace' => $isMarketplace, 'products' => $availableProducts,
-            'partners' => DB::table('delivery_partners')->where(function ($query) use ($order) {
+            'localities' => ServiceLocations::query()->get(), 'items' => $items, 'isMarketplace' => $isMarketplace, 'products' => $availableProducts,
+            'partners' => ServiceLocations::eligible(DeliveryZones::eligible(DB::table('delivery_partners'), $order->delivery_zone_id), $order->locality_id)->where(function ($query) use ($order) {
                 $query->where(function ($query) {
                     $query->where('active', true)->whereExists(fn ($kyc) => $kyc->selectRaw('1')->from('delivery_partner_kycs')->whereColumn('delivery_partner_kycs.delivery_partner_id', 'delivery_partners.id')->where('status', 'approved'));
                 })->orWhere('id', $order->delivery_partner_id);
@@ -87,7 +91,7 @@ class AdminOrderController extends Controller
             'revision' => 'required|integer|min:0',
             'address' => 'required|array', 'address.name' => 'required|string|max:120',
             'address.phone' => ['required', 'regex:/^[6-9]\d{9}$/'], 'address.street' => 'required|string|max:255',
-            'address.city' => 'required|string|max:120', 'address.pin' => ['required', 'regex:/^[1-9]\d{5}$/'],
+            'address.locality_id' => 'nullable|integer', 'address.city' => 'required|string|max:120', 'address.latitude' => 'nullable|required_with:address.longitude|numeric|between:-90,90', 'address.longitude' => 'nullable|required_with:address.latitude|numeric|between:-180,180', 'address.pin' => ['required', 'regex:/^[1-9]\d{5}$/'],
             'quantities' => 'required|array|min:1|max:100', 'quantities.*' => 'required|integer|min:0|max:99',
             'add_product_id' => 'nullable|integer|exists:products,id', 'add_quantity' => 'nullable|integer|min:1|max:99',
             'delivery_preference' => 'required|in:standard,evening',
@@ -102,6 +106,14 @@ class AdminOrderController extends Controller
             }
             if ((int) $input['revision'] !== $order->revision) {
                 throw ValidationException::withMessages(['order' => 'This order changed while you were editing. Reopen the editor to load the latest details.']);
+            }
+            $previousAddress = json_decode($order->delivery_address, true);
+            if ($order->locality_id) {
+                if ((int) ($input['address']['locality_id'] ?? $order->locality_id) === (int) $order->locality_id) {
+                    $input['address'] = array_merge($previousAddress, collect($input['address'])->only(['name', 'phone', 'street'])->all());
+                } else {
+                    $input['address'] = ServiceLocations::address($input['address'], true);
+                }
             }
             $items = DB::table('order_items')->where('order_id', $id)->orderBy('id')->get();
             if (array_diff(array_keys($input['quantities']), $items->pluck('id')->all()) || count($input['quantities']) !== $items->count()) {
@@ -174,11 +186,12 @@ class AdminOrderController extends Controller
                 throw ValidationException::withMessages(['delivery_partner_id' => 'Choose an active delivery partner with approved KYC.']);
             }
             $discount = ($order->coupon_code === 'DROP10' || $order->discount_paise > 0) && $subtotal >= 10000 ? min(5000, (int) round($subtotal * .1)) : 0;
-            $previousAddress = json_decode($order->delivery_address, true);
-            $rules = $input['address']['pin'] === $previousAddress['pin'] && $order->delivery_rules
-                ? json_decode($order->delivery_rules, true) : DeliveryPricing::rules($input['address']['pin'], true);
+            $sameDestination = ($input['address']['locality_id'] ?? null) == ($previousAddress['locality_id'] ?? null) && $input['address']['pin'] === $previousAddress['pin'] && ($input['address']['latitude'] ?? null) == ($previousAddress['latitude'] ?? null) && ($input['address']['longitude'] ?? null) == ($previousAddress['longitude'] ?? null);
+            $rules = $sameDestination && $order->delivery_rules ? json_decode($order->delivery_rules, true) : ($order->locality_id ? DeliveryPricing::forAddress($input['address'], true) : DeliveryPricing::rules($input['address']['pin'], true));
+            ServiceLocations::assertPartner($partnerId ? (int) $partnerId : null, $rules['locality_id'] ?? null);
+            DeliveryZones::assertPartner($partnerId ? (int) $partnerId : null, $rules['zone_id'] ?? null);
             $delivery = DeliveryPricing::fee($rules, $subtotal);
-            $changes = ['coupon_code' => ($order->coupon_code === 'DROP10' || $order->discount_paise > 0) ? 'DROP10' : null, 'delivery_address' => json_encode($input['address']), 'delivery_rules' => json_encode($rules), 'delivery_preference' => $input['delivery_preference'], 'delivery_partner_id' => $partnerId, 'admin_notes' => $input['admin_notes'] ?? null, 'subtotal_paise' => $subtotal, 'discount_paise' => $discount, 'delivery_paise' => $delivery, 'total_paise' => $subtotal - $discount + $delivery, 'revision' => $order->revision + 1, 'updated_at' => now()];
+            $changes = ['locality_id' => $rules['locality_id'] ?? null, 'delivery_zone_id' => $rules['zone_id'] ?? null, 'coupon_code' => ($order->coupon_code === 'DROP10' || $order->discount_paise > 0) ? 'DROP10' : null, 'delivery_address' => json_encode($input['address']), 'delivery_rules' => json_encode($rules), 'delivery_preference' => $input['delivery_preference'], 'delivery_partner_id' => $partnerId, 'admin_notes' => $input['admin_notes'] ?? null, 'subtotal_paise' => $subtotal, 'discount_paise' => $discount, 'delivery_paise' => $delivery, 'total_paise' => $subtotal - $discount + $delivery, 'revision' => $order->revision + 1, 'updated_at' => now()];
             foreach ($stockChanges as $productId => $delta) {
                 if ($delta !== 0) {
                     Inventory::change($products->get($productId), -$delta, 'order_modified', $input['reason'], $request->user()->id, $id);
@@ -195,7 +208,12 @@ class AdminOrderController extends Controller
                 DB::table('order_items')->insert($item + ['order_id' => $id, 'created_at' => now(), 'updated_at' => now()]);
             }
             DB::table('orders')->where('id', $id)->update($changes);
-            OrderAftercare::payment(DB::table('orders')->find($id));
+            $updated = DB::table('orders')->find($id);
+            OrderAftercare::payment($updated);
+            AppNotifications::customer($updated, 'modified:'.$updated->revision, 'Order updated', 'Your order details have changed. Open the order to review the latest information.');
+            if ($order->delivery_partner_id != $partnerId) {
+                AppNotifications::assignment($updated, $order->delivery_partner_id);
+            }
             DB::table('order_transactions')->where('order_id', $id)->where('type', 'payment')->where('status', 'pending')->update(['amount_paise' => $changes['total_paise'], 'updated_at' => now()]);
             DB::table('order_events')->insert(['order_id' => $id, 'admin_id' => $request->user()->id, 'action' => 'Order modified', 'details' => json_encode(['reason' => $input['reason'], 'before' => ['order' => $order, 'items' => $items], 'after' => ['order' => $changes, 'items' => $updatedItems]]), 'created_at' => now(), 'updated_at' => now()]);
         }, 3);
@@ -218,7 +236,10 @@ class AdminOrderController extends Controller
             if (! DB::table('delivery_partners')->where('id', $input['delivery_partner_id'])->where('active', true)->whereExists(fn ($kyc) => $kyc->selectRaw('1')->from('delivery_partner_kycs')->whereColumn('delivery_partner_kycs.delivery_partner_id', 'delivery_partners.id')->where('status', 'approved'))->lockForUpdate()->exists()) {
                 throw ValidationException::withMessages(['delivery_partner_id' => 'Choose an active delivery partner with approved KYC.']);
             }
+            ServiceLocations::assertPartner((int) $input['delivery_partner_id'], $order->locality_id);
+            DeliveryZones::assertPartner((int) $input['delivery_partner_id'], $order->delivery_zone_id);
             DB::table('orders')->where('id', $id)->update(['delivery_partner_id' => $input['delivery_partner_id'], 'revision' => $order->revision + 1, 'updated_at' => now()]);
+            AppNotifications::assignment(DB::table('orders')->find($id), $order->delivery_partner_id);
             OrderAftercare::event($id, $request->user()->id, 'Delivery partner assigned', ['from' => $order->delivery_partner_id, 'to' => (int) $input['delivery_partner_id'], 'reason' => $input['reason']]);
         }, 3);
 
@@ -241,6 +262,10 @@ class AdminOrderController extends Controller
             if (! in_array($input['status'], $next[$order->status] ?? [], true)) {
                 throw ValidationException::withMessages(['status' => 'That status transition is not allowed.']);
             }
+            if ($input['status'] === 'out_for_delivery') {
+                ServiceLocations::assertPartner($order->delivery_partner_id, $order->locality_id);
+                DeliveryZones::assertPartner($order->delivery_partner_id, $order->delivery_zone_id);
+            }
             if ($input['status'] === 'out_for_delivery' && DB::table('order_items')->join('products', 'products.id', '=', 'order_items.product_id')->where('order_id', $id)->whereNull('order_items.vendor_id')->where('expires_on', '<', today('Asia/Kolkata')->toDateString())->exists()) {
                 throw ValidationException::withMessages(['status' => 'An item in this order has expired. Replace or remove it before dispatch.']);
             }
@@ -255,6 +280,7 @@ class AdminOrderController extends Controller
             } else {
                 DB::table('orders')->where('id', $id)->update(['status' => $input['status'], 'revision' => $order->revision + 1, 'updated_at' => now()]);
             }
+            AppNotifications::status(DB::table('orders')->find($id));
             DB::table('order_events')->insert(['order_id' => $id, 'admin_id' => $request->user()->id, 'action' => 'Status updated', 'details' => json_encode(['from' => $order->status, 'to' => $input['status'], 'reason' => $input['reason'] ?? null]), 'created_at' => now(), 'updated_at' => now()]);
         }, 3);
 

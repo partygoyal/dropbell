@@ -8,6 +8,19 @@ use Illuminate\Support\Facades\DB;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function serviceLocality(string $pin = '560001'): int
+    {
+        $existing = DB::table('service_localities')->where('postal_code', $pin)->value('id');
+        if ($existing) {
+            return (int) $existing;
+        }
+        $state = DB::table('service_states')->insertGetId(['name' => 'State '.$pin, 'active' => true]);
+        $city = DB::table('service_cities')->insertGetId(['state_id' => $state, 'name' => 'City '.$pin, 'active' => true]);
+        $area = DB::table('delivery_areas')->where('postal_code', $pin)->first();
+
+        return DB::table('service_localities')->insertGetId(['city_id' => $city, 'name' => $area->name ?? 'Locality '.$pin, 'postal_code' => $pin, 'fee_paise' => $area->fee_paise ?? 0, 'active' => true]);
+    }
+
     protected function publishProduct(int $productId, ?int $price = null, array $pins = ['560001', '110001']): int
     {
         $vendorId = DB::table('vendors')->insertGetId([

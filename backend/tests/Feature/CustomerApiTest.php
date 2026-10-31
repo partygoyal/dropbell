@@ -21,7 +21,7 @@ class CustomerApiTest extends TestCase
 
     private function address(): array
     {
-        return ['label' => 'Home', 'name' => 'Customer', 'phone' => '9876543210', 'street' => '12 Garden Road', 'city' => 'Bengaluru', 'pin' => '560001'];
+        return ['locality_id' => $this->serviceLocality(), 'label' => 'Home', 'name' => 'Customer', 'phone' => '9876543210', 'street' => '12 Garden Road', 'city' => 'Bengaluru', 'pin' => '560001'];
     }
 
     private function payload(): array

@@ -14,6 +14,9 @@ return [
     |
     */
 
+    'google_routes' => ['key' => env('GOOGLE_ROUTES_API_KEY')],
+    'firebase' => ['credentials' => env('FIREBASE_CREDENTIALS')],
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],

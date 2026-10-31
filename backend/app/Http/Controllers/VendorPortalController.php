@@ -43,14 +43,30 @@ class VendorPortalController extends Controller
 
     public function products(Request $request): View
     {
-        $input = $request->validate(['category' => 'nullable|exists:categories,name', 'sub_category_id' => 'nullable|integer|exists:sub_categories,id', 'q' => 'nullable|string|max:120', 'selected' => 'nullable|in:1']);
+        $input = $request->validate(['category' => 'nullable|string|max:80|exists:categories,name', 'sub_category_id' => 'nullable|integer|exists:sub_categories,id', 'q' => 'nullable|string|max:120', 'selected' => 'nullable|in:1', 'uncategorized' => 'nullable|in:1']);
         $vendor = $request->attributes->get('vendor');
+        $category = $input['category'] ?? null;
+        if (! empty($input['sub_category_id'])) {
+            $sub = DB::table('sub_categories')->join('categories', 'categories.id', '=', 'sub_categories.category_id')->where('sub_categories.id', $input['sub_category_id'])->where('sub_categories.active', true)->where('categories.active', true)->select('categories.name')->first();
+            if (! $sub || ($category && $category !== $sub->name) || ! empty($input['uncategorized'])) {
+                throw ValidationException::withMessages(['sub_category_id' => 'Choose a sub-category belonging to the selected category.']);
+            }
+            $category = $sub->name;
+        }
+        $categories = DB::table('categories')->where('active', true)->orderBy('name')->get();
+        $selectedCategory = $categories->firstWhere('name', $category);
+        if ($category && ! $selectedCategory) {
+            throw ValidationException::withMessages(['category' => 'Choose an active category.']);
+        }
+        $subCategories = DB::table('sub_categories')->where('active', true)->where('category_id', $selectedCategory?->id ?? 0)->orderBy('name')->get();
         $query = Marketplace::catalogue()->leftJoin('vendor_products', fn ($join) => $join->on('products.id', '=', 'vendor_products.product_id')->where('vendor_products.vendor_id', $vendor->id))->select('products.*', 'vendor_products.price_paise as vendor_price', 'vendor_products.available as vendor_available', 'vendor_products.revision as offer_revision', 'vendor_products.stock_quantity as vendor_stock');
-        if (! empty($input['category'])) {
-            $query->where('products.category', $input['category']);
+        if ($category) {
+            $query->where('products.category', $category);
         }
         if (! empty($input['sub_category_id'])) {
             $query->where('products.sub_category_id', $input['sub_category_id']);
+        } elseif (! empty($input['uncategorized'])) {
+            $query->whereNull('products.sub_category_id');
         }
         if (! empty($input['q'])) {
             $query->where('products.name', 'like', '%'.$input['q'].'%');
@@ -58,8 +74,61 @@ class VendorPortalController extends Controller
         if (! empty($input['selected'])) {
             $query->whereNotNull('vendor_products.id');
         }
+        $showProducts = $category || ! empty($input['q']) || ! empty($input['selected']);
+        if (! $showProducts) {
+            $query->whereRaw('1 = 0');
+        }
 
-        return view('vendor.products', ['vendor' => $vendor, 'products' => $query->orderBy('products.name')->paginate(20)->withQueryString(), 'categories' => DB::table('categories')->where('active', true)->orderBy('name')->get(), 'subCategories' => DB::table('sub_categories')->join('categories', 'categories.id', '=', 'sub_categories.category_id')->where('sub_categories.active', true)->where('categories.active', true)->select('sub_categories.*', 'categories.name as category_name')->orderBy('sub_categories.name')->get()]);
+        return view('vendor.products', [
+            'vendor' => $vendor, 'products' => $query->orderBy('products.name')->paginate(30)->withQueryString(),
+            'categories' => $categories, 'selectedCategory' => $selectedCategory, 'subCategories' => $subCategories,
+            'showProducts' => $showProducts,
+            'hasUncategorized' => $selectedCategory && Marketplace::catalogue()->where('products.category', $category)->whereNull('products.sub_category_id')->exists(),
+        ]);
+    }
+
+    public function saveProducts(Request $request): RedirectResponse
+    {
+        $input = $request->validate([
+            'products' => 'required|array|min:1|max:30',
+            'products.*.id' => 'required|integer|distinct|min:1',
+            'products.*.revision' => 'required|integer|min:0',
+            'products.*.available' => 'required|boolean',
+            'products.*.stock_quantity' => 'nullable|integer|min:0|max:1000000',
+            'products.*.price' => ['nullable', 'numeric', 'min:0.01', 'max:100000', 'regex:/^\d+(\.\d{1,2})?$/'],
+        ]);
+        DB::transaction(function () use ($request, $input): void {
+            $ids = array_column($input['products'], 'id');
+            $products = Marketplace::catalogue()->whereIn('products.id', $ids)->orderBy('products.id')->lockForUpdate()->get()->keyBy('id');
+            abort_unless($products->count() === count($ids), 404, 'A product is no longer in the catalogue. Reload your selection.');
+            $vendor = DB::table('vendors')->where('user_id', $request->user()->id)->lockForUpdate()->first();
+            abort_if($vendor->status === 'suspended', 403, 'Your account is suspended. Contact Dropbell.');
+            $offers = DB::table('vendor_products')->where('vendor_id', $vendor->id)->whereIn('product_id', $ids)->orderBy('product_id')->lockForUpdate()->get()->keyBy('product_id');
+            foreach ($input['products'] as $key => $row) {
+                $offer = $offers->get($row['id']);
+                $product = $products->get($row['id']);
+                if ((int) $row['revision'] !== ($offer?->revision ?? 0)) {
+                    throw ValidationException::withMessages(['products.'.$key.'.revision' => $product->name.' changed since you opened this page. Reload before saving. No changes were saved.']);
+                }
+                if ($row['available'] && ! isset($row['price'])) {
+                    throw ValidationException::withMessages(['products.'.$key.'.price' => 'Enter your selling price for '.$product->name.'.']);
+                }
+                if (! $offer && ! $row['available']) {
+                    continue;
+                }
+                $price = isset($row['price']) ? (int) round((float) $row['price'] * 100) : ($offer?->price_paise ?? 0);
+                $stock = array_key_exists('stock_quantity', $row) ? (isset($row['stock_quantity']) ? (int) $row['stock_quantity'] : null) : $offer?->stock_quantity;
+                if ($offer && (bool) $offer->available === (bool) $row['available'] && $offer->price_paise === $price && $offer->stock_quantity === $stock) {
+                    continue;
+                }
+                DB::table('vendor_products')->updateOrInsert(['vendor_id' => $vendor->id, 'product_id' => $row['id']], [
+                    'price_paise' => $price, 'stock_quantity' => $stock, 'available' => (bool) $row['available'],
+                    'revision' => ($offer?->revision ?? 0) + 1, 'created_at' => $offer?->created_at ?? now(), 'updated_at' => now(),
+                ]);
+            }
+        }, 3);
+
+        return redirect()->route('vendor.products', $request->only(['category', 'sub_category_id', 'uncategorized', 'q', 'selected', 'page']))->with('status', 'Shop availability saved. Available products appear to customers in your approved delivery areas.');
     }
 
     public function saveProduct(Request $request, int $id): RedirectResponse

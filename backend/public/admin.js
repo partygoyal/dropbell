@@ -66,7 +66,9 @@
     const discount = form.dataset.discount === '1' && subtotal >= 10000 ? Math.min(5000, Math.round(subtotal * .1)) : 0;
     const configuration = JSON.parse(form.querySelector('[data-delivery-rules]').value);
     const postalCode = form.elements['address[pin]'].value;
-    const rules = postalCode === configuration.postal_code && configuration.saved ? configuration.saved : configuration.areas.find(area => area.postal_code === postalCode);
+    const localityId = form.elements['address[locality_id]']?.value;
+    const locality = configuration.localities?.find(area => String(area.id) === localityId);
+    const rules = localityId ? (String(configuration.locality_id) === localityId && configuration.saved ? configuration.saved : locality ? { ...locality, minimum_paise: 0, free_above_paise: null } : null) : postalCode === configuration.postal_code && configuration.saved ? configuration.saved : configuration.areas.find(area => area.postal_code === postalCode);
     if (!rules) { summary.textContent = 'This postal code is not serviceable. Choose an active delivery area before saving.'; return; }
     if (subtotal < rules.minimum_paise) { summary.textContent = `Minimum items subtotal for ${rules.name}: ${format(rules.minimum_paise)}.`; return; }
     const delivery = rules.free_above_paise !== null && subtotal >= rules.free_above_paise ? 0 : rules.fee_paise;
@@ -75,4 +77,36 @@
   form.addEventListener('input', preview);
   form.addEventListener('change', preview);
   preview();
+})();
+
+(() => {
+  const form = document.querySelector('[data-vendor-selection]');
+  if (!form) return;
+  const checks = [...form.querySelectorAll('[data-vendor-available]')];
+  const all = form.querySelector('[data-vendor-select-all]');
+  const count = form.querySelector('[data-vendor-selected-count]');
+  const state = form.querySelector('[data-vendor-save-state]');
+  let dirty = false;
+  let saving = false;
+  function refresh() {
+    const selected = checks.filter(input => input.checked).length;
+    count.textContent = `${selected} of ${checks.length} marked available`;
+    all.checked = selected === checks.length;
+    all.indeterminate = selected > 0 && selected < checks.length;
+    for (const input of checks) input.closest('article').querySelector('[data-vendor-price]').required = input.checked;
+  }
+  all.addEventListener('change', () => { for (const input of checks) input.checked = all.checked; refresh(); });
+  form.addEventListener('input', event => { dirty = true; state.textContent = 'Unsaved changes'; if (event.target !== all) refresh(); });
+  form.addEventListener('change', () => { dirty = true; state.textContent = 'Unsaved changes'; refresh(); });
+  window.addEventListener('beforeunload', event => { if (dirty && !saving) { event.preventDefault(); event.returnValue = ''; } });
+  form.addEventListener('submit', event => {
+    if (saving) { event.preventDefault(); return; }
+    saving = true;
+    const button = form.querySelector('[data-vendor-save]');
+    button.disabled = true;
+    button.textContent = 'Saving availability…';
+  });
+  // Restore controls when the browser returns to this page from its back cache.
+  window.addEventListener('pageshow', () => { saving = false; const button = form.querySelector('[data-vendor-save]'); button.disabled = form.querySelector('fieldset').disabled; button.textContent = 'Save availability'; });
+  refresh();
 })();

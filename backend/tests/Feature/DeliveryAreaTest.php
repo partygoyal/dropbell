@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\DeliveryPricing;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class DeliveryAreaTest extends TestCase
@@ -49,14 +51,13 @@ class DeliveryAreaTest extends TestCase
         $this->postJson('/admin/delivery-areas', array_replace($input, ['postal_code' => '123', 'fee' => '-1', 'free_above' => '50']))->assertUnprocessable()->assertJsonValidationErrors(['postal_code', 'fee', 'free_above']);
     }
 
-    public function test_quote_uses_catalogue_prices_and_does_not_reserve_stock(): void
+    public function test_legacy_rules_remain_available_for_pre_master_orders(): void
     {
-        $this->customer();
         $this->area();
-        $payload = $this->payload();
-        $this->postJson('/api/customer/quote', ['items' => $payload['items'], 'postal_code' => '560001', 'coupon' => 'DROP10', 'subtotal' => 1])->assertOk()->assertJsonPath('data.bill.subtotal', 20000)->assertJsonPath('data.bill.delivery', 4000)->assertJsonPath('data.bill.total', 22000)->assertJsonPath('data.rules.name', 'Central');
+        $rules = DeliveryPricing::rules('560001');
+        $this->assertSame(4000, DeliveryPricing::fee($rules, 20000));
+        $this->assertSame('Central', $rules['name']);
         $this->assertDatabaseCount('orders', 0);
-        $this->assertDatabaseHas('products', ['id' => $payload['items'][0]['id'], 'stock_quantity' => 20]);
     }
 
     public function test_quotes_require_authentication_and_valid_items(): void
@@ -66,66 +67,34 @@ class DeliveryAreaTest extends TestCase
         $this->postJson('/api/customer/quote', ['items' => [], 'postal_code' => 'bad'])->assertUnprocessable()->assertJsonValidationErrors(['items', 'postal_code']);
     }
 
-    public function test_unknown_inactive_and_below_minimum_areas_reject_checkout_without_stock_changes(): void
+    public function test_legacy_minimum_rejects_insufficient_subtotal(): void
     {
-        $this->customer();
-        $payload = $this->payload();
-        $this->postJson('/api/customer/orders', $payload)->assertUnprocessable()->assertJsonValidationErrors('postal_code');
-        $area = $this->area(['active' => false]);
-        $this->postJson('/api/customer/orders', $payload)->assertUnprocessable();
-        DB::table('delivery_areas')->where('id', $area)->update(['active' => true, 'minimum_paise' => 25000]);
-        $this->postJson('/api/customer/orders', $payload)->assertUnprocessable()->assertJsonValidationErrors('items');
-        $this->assertDatabaseCount('orders', 0);
-        $this->assertDatabaseHas('products', ['id' => $payload['items'][0]['id'], 'stock_quantity' => 20]);
+        $this->area(['minimum_paise' => 25000]);
+        $this->expectException(ValidationException::class);
+        DeliveryPricing::fee(DeliveryPricing::rules('560001'), 20000);
     }
 
     public function test_free_delivery_threshold_uses_subtotal_before_discount(): void
     {
-        $this->customer();
         $this->area();
-        $payload = $this->payload(3);
-        $payload['expected_total'] = 27000;
-        $this->postJson('/api/customer/orders', $payload)->assertCreated()->assertJsonPath('data.bill.delivery', 0)->assertJsonPath('data.bill.total', 27000);
-        $this->assertDatabaseHas('orders', ['subtotal_paise' => 30000, 'discount_paise' => 3000, 'delivery_paise' => 0]);
+        $rules = DeliveryPricing::rules('560001');
+        $this->assertSame(0, DeliveryPricing::fee($rules, 30000));
+        $this->assertSame(4000, DeliveryPricing::fee($rules, 29999));
     }
 
-    public function test_fee_changes_require_a_new_quote_but_existing_order_retries_keep_the_order(): void
+    public function test_legacy_fee_snapshot_does_not_change_with_current_rules(): void
     {
-        $this->customer();
-        $area = $this->area();
-        $payload = $this->payload();
-        DB::table('delivery_areas')->where('id', $area)->update(['fee_paise' => 5000]);
-        $this->postJson('/api/customer/orders', $payload)->assertUnprocessable()->assertJsonValidationErrors('expected_total');
-        $this->assertDatabaseCount('orders', 0);
-        $payload['expected_total'] = 23000;
-        $reference = $this->postJson('/api/customer/orders', $payload)->assertCreated()->json('data.id');
-        $rules = json_decode(DB::table('orders')->value('delivery_rules'), true);
-        $this->assertSame(5000, $rules['fee_paise']);
-        DB::table('delivery_areas')->where('id', $area)->update(['active' => false]);
-        $this->postJson('/api/customer/orders', $payload)->assertCreated()->assertJsonPath('data.id', $reference);
-        $this->assertDatabaseCount('orders', 1);
+        $id = $this->area();
+        $snapshot = DeliveryPricing::rules('560001');
+        DB::table('delivery_areas')->where('id', $id)->update(['fee_paise' => 5000]);
+        $this->assertSame(4000, DeliveryPricing::fee($snapshot, 20000));
+        $this->assertSame(5000, DeliveryPricing::fee(DeliveryPricing::rules('560001'), 20000));
     }
 
-    public function test_admin_edits_keep_saved_rules_but_revalidate_a_changed_postal_code(): void
+    public function test_legacy_inactive_postal_area_cannot_be_requoted(): void
     {
-        $this->customer();
-        $area = $this->area();
-        $payload = $this->payload();
-        $this->postJson('/api/customer/orders', $payload)->assertCreated();
-        $order = DB::table('orders')->first();
-        $item = DB::table('order_items')->first();
-        DB::table('delivery_areas')->where('id', $area)->update(['fee_paise' => 9000, 'active' => false]);
-        $this->actingAs(User::factory()->create(['is_admin' => true]));
-        $edit = ['revision' => 0, 'address' => $payload['address'], 'quantities' => [$item->id => 2], 'delivery_preference' => 'standard', 'reason' => 'Update contact'];
-        $this->put('/admin/orders/'.$order->id, $edit)->assertRedirect();
-        $this->assertDatabaseHas('orders', ['id' => $order->id, 'delivery_paise' => 4000, 'total_paise' => 22000]);
-        $item = DB::table('order_items')->first();
-        $edit['revision'] = 1;
-        $edit['quantities'] = [$item->id => 2];
-        $edit['address']['pin'] = '110001';
-        $this->putJson('/admin/orders/'.$order->id, $edit)->assertUnprocessable()->assertJsonValidationErrors('postal_code');
-        $this->area(['name' => 'North', 'postal_code' => '110001', 'fee_paise' => 1000]);
-        $this->put('/admin/orders/'.$order->id, $edit)->assertRedirect();
-        $this->assertDatabaseHas('orders', ['id' => $order->id, 'delivery_paise' => 1000, 'total_paise' => 19000]);
+        $this->area(['active' => false]);
+        $this->expectException(ValidationException::class);
+        DeliveryPricing::rules('560001');
     }
 }

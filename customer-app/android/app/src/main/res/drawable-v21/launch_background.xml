@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><shape><solid android:color="#0064C8" /></shape></item>
+    <item android:width="160dp" android:height="160dp" android:gravity="center">
+        <bitmap android:gravity="fill" android:src="@drawable/dropbell_splash_icon" />
+    </item>
+</layer-list>

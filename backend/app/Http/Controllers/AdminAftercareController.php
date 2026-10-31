@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AppNotifications;
 use App\Services\OrderAftercare;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -86,6 +87,7 @@ class AdminAftercareController extends Controller
                 }
             }
             DB::table('customer_requests')->where('id', $id)->update(['status' => $status, 'amount_paise' => $amount, 'review_note' => $input['review_note'], 'reviewed_by' => $request->user()->id, 'reviewed_at' => now(), 'revision' => $record->revision + 1, 'updated_at' => now()]);
+            AppNotifications::customer(DB::table('orders')->find($order->id), 'request:'.$id.':'.($record->revision + 1), 'Request updated', 'Your '.$record->type.' request is now '.$status.'. Open the order for details.');
             OrderAftercare::event($order->id, $request->user()->id, ucfirst($record->type).' request '.$status, ['request_id' => $id, 'from' => $record->status, 'to' => $status, 'reason' => $input['review_note'], 'amount_paise' => $amount, 'reference' => $input['reference'] ?? null]);
         }, 3);
 

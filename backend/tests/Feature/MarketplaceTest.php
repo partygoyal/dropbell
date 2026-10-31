@@ -75,8 +75,8 @@ class MarketplaceTest extends TestCase
         $offer = $this->publishProduct($id, 6000);
         $customer = User::factory()->create();
         DB::table('customer_tokens')->insert(['user_id' => $customer->id, 'token_hash' => hash('sha256', 'price-token'), 'expires_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()]);
-        $input = ['request_key' => (string) Str::uuid(), 'items' => [['id' => $id, 'quantity' => 1]], 'address' => ['name' => 'Customer', 'phone' => '9876543210', 'street' => '12 Road', 'city' => 'City', 'pin' => '560001'], 'payment' => 'cod', 'delivery' => 'standard', 'expected_total' => 8500];
-        $this->withToken('price-token')->postJson('/api/customer/quote', ['items' => $input['items'], 'postal_code' => '560001'])->assertOk()->assertJsonPath('data.bill.total', 8500);
+        $input = ['request_key' => (string) Str::uuid(), 'items' => [['id' => $id, 'quantity' => 1]], 'address' => ['locality_id' => $this->serviceLocality(), 'name' => 'Customer', 'phone' => '9876543210', 'street' => '12 Road', 'city' => 'City', 'pin' => '560001'], 'payment' => 'cod', 'delivery' => 'standard', 'expected_total' => 8500];
+        $this->withToken('price-token')->postJson('/api/customer/quote', ['items' => $input['items'], 'postal_code' => '560001', 'address' => $input['address']])->assertOk()->assertJsonPath('data.bill.total', 8500);
         DB::table('vendor_products')->where('id', $offer)->update(['price_paise' => 7000]);
         $this->postJson('/api/customer/orders', $input)->assertUnprocessable()->assertJsonValidationErrors('expected_total');
         DB::table('vendor_products')->where('id', $offer)->update(['available' => false]);
@@ -129,9 +129,9 @@ class MarketplaceTest extends TestCase
         $riceOffer = $this->publishProduct($rice, 8000);
         $customer = User::factory()->create();
         DB::table('customer_tokens')->insert(['user_id' => $customer->id, 'token_hash' => hash('sha256', 'market-token'), 'expires_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()]);
-        $address = ['name' => 'Customer', 'phone' => '9876543210', 'street' => '12 Garden Road', 'city' => 'Bengaluru', 'pin' => '560001'];
+        $address = ['locality_id' => $this->serviceLocality(), 'name' => 'Customer', 'phone' => '9876543210', 'street' => '12 Garden Road', 'city' => 'Bengaluru', 'pin' => '560001'];
         $input = ['request_key' => (string) Str::uuid(), 'items' => [['id' => $milk, 'quantity' => 1], ['id' => $rice, 'quantity' => 1]], 'address' => $address, 'payment' => 'cod', 'delivery' => 'standard', 'expected_total' => 16500];
-        $this->withToken('market-token')->postJson('/api/customer/quote', ['items' => $input['items'], 'postal_code' => '560001'])->assertOk();
+        $this->withToken('market-token')->postJson('/api/customer/quote', ['items' => $input['items'], 'postal_code' => '560001', 'address' => $input['address']])->assertOk();
         $this->postJson('/api/customer/orders', $input)->assertCreated();
         $this->postJson('/api/customer/orders', $input)->assertCreated();
         $this->assertDatabaseCount('orders', 1);

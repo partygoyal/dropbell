@@ -44,6 +44,7 @@ class OrderAftercare
         self::payment($order);
         DB::table('order_transactions')->where('order_id', $order->id)->where('type', 'payment')->where('status', 'pending')->update(['status' => 'voided', 'updated_at' => now()]);
         DB::table('orders')->where('id', $order->id)->update(['status' => 'cancelled', 'revision' => $order->revision + 1, 'updated_at' => now()]);
+        AppNotifications::status(DB::table('orders')->find($order->id));
     }
 
     public static function presentRequest(object $request): array

@@ -7,6 +7,11 @@ use Illuminate\Validation\ValidationException;
 
 class DeliveryPricing
 {
+    public static function forAddress(array $address, bool $lock = false): array
+    {
+        return ServiceLocations::rules($address, $lock);
+    }
+
     public static function rules(string $postalCode, bool $lock = false): array
     {
         $query = DB::table('delivery_areas')->where('postal_code', $postalCode)->where('active', true);

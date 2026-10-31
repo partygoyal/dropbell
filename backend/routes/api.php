@@ -1,13 +1,38 @@
 <?php
 
+use App\Http\Controllers\AppNotificationController;
 use App\Http\Controllers\CustomerAftercareController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerOrderController;
+use App\Http\Controllers\CustomerPasswordController;
+use App\Http\Controllers\PartnerController;
+use App\Http\Controllers\SupportController;
 use App\Http\Middleware\AuthenticateCustomer;
+use App\Http\Middleware\AuthenticatePartner;
+use App\Services\DeliveryZones;
 use App\Services\Marketplace;
+use App\Services\ServiceLocations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/partner/auth/login', [PartnerController::class, 'login'])->middleware('throttle:10,1,partner-password:');
+Route::post('/partner/auth/request', [PartnerController::class, 'requestOtp'])->middleware('throttle:10,1,partner-otp:');
+Route::post('/partner/auth/verify', [PartnerController::class, 'verifyOtp'])->middleware('throttle:15,1,partner-verify:');
+Route::prefix('partner')->middleware([AuthenticatePartner::class, 'throttle:120,1'])->group(function () {
+    Route::get('/notifications', [AppNotificationController::class, 'index']);
+    Route::patch('/notifications/{id}/read', [AppNotificationController::class, 'read'])->whereNumber('id');
+    Route::post('/notification-devices', [AppNotificationController::class, 'register']);
+    Route::delete('/notification-devices/{installation}', [AppNotificationController::class, 'unregister'])->whereUuid('installation');
+
+    Route::get('/me', [PartnerController::class, 'profile']);
+    Route::patch('/availability', [PartnerController::class, 'availability']);
+    Route::post('/logout', [PartnerController::class, 'logout']);
+    Route::get('/orders', [PartnerController::class, 'orders']);
+    Route::get('/orders/{reference}', [PartnerController::class, 'show']);
+    Route::post('/orders/{reference}/pickup', [PartnerController::class, 'pickup']);
+    Route::post('/orders/{reference}/complete', [PartnerController::class, 'complete']);
+});
 
 Route::get('/health', function () {
     DB::select('SELECT 1');
@@ -16,8 +41,11 @@ Route::get('/health', function () {
 });
 
 Route::get('/products', function (Request $request) {
-    $input = $request->validate(['category' => 'nullable|string|max:80', 'q' => 'nullable|string|max:120', 'postal_code' => ['nullable', 'regex:/^[1-9]\d{5}$/']]);
-    $query = Marketplace::publicProducts($input['postal_code'] ?? null);
+    $input = $request->validate(['category' => 'nullable|string|max:80', 'q' => 'nullable|string|max:120', 'postal_code' => ['nullable', 'regex:/^[1-9]\d{5}$/'], 'locality_id' => 'nullable|integer', 'vendor_id' => 'nullable|integer|min:1']);
+    if (! empty($input['locality_id'])) {
+        $input['postal_code'] = ServiceLocations::address(['locality_id' => $input['locality_id']])['pin'];
+    }
+    $query = Marketplace::publicProducts($input['postal_code'] ?? null, isset($input['vendor_id']) ? (int) $input['vendor_id'] : null);
     if (! empty($input['category'])) {
         $query->where('products.category', $input['category']);
     }
@@ -25,11 +53,14 @@ Route::get('/products', function (Request $request) {
         $query->where('products.name', 'like', '%'.$input['q'].'%');
     }
 
-    return response()->json(['categories' => DB::table('categories')->where('active', true)->orderBy('id')->get(['id', 'name']), 'sub_categories' => DB::table('sub_categories')->where('active', true)->whereIn('category_id', DB::table('categories')->where('active', true)->select('id'))->orderBy('name')->get(['id', 'name', 'category_id']), 'data' => $query->orderBy('products.id')->get()->map(fn (object $product): array => Marketplace::present($product))]);
+    return response()->json(['vendors' => Marketplace::publicVendors($input['postal_code'] ?? null)->get(), 'categories' => DB::table('categories')->where('active', true)->orderBy('id')->get(['id', 'name']), 'sub_categories' => DB::table('sub_categories')->where('active', true)->whereIn('category_id', DB::table('categories')->where('active', true)->select('id'))->orderBy('name')->get(['id', 'name', 'category_id']), 'data' => $query->orderBy('products.id')->get()->map(fn (object $product): array => Marketplace::present($product))]);
 });
 Route::get('/products/{id}', function (Request $request, int $id) {
-    $input = $request->validate(['postal_code' => ['nullable', 'regex:/^[1-9]\d{5}$/']]);
-    $product = Marketplace::publicProducts($input['postal_code'] ?? null)->where('products.id', $id)->first();
+    $input = $request->validate(['postal_code' => ['nullable', 'regex:/^[1-9]\d{5}$/'], 'locality_id' => 'nullable|integer', 'vendor_id' => 'nullable|integer|min:1']);
+    if (! empty($input['locality_id'])) {
+        $input['postal_code'] = ServiceLocations::address(['locality_id' => $input['locality_id']])['pin'];
+    }
+    $product = Marketplace::publicProducts($input['postal_code'] ?? null, isset($input['vendor_id']) ? (int) $input['vendor_id'] : null)->where('products.id', $id)->first();
     abort_unless($product, 404);
 
     return response()->json(['data' => Marketplace::present($product)]);
@@ -39,9 +70,24 @@ Route::post('/customer/sample-quote', [CustomerOrderController::class, 'sampleQu
 Route::post('/customer/sample-orders', [CustomerOrderController::class, 'storeSample'])->middleware('throttle:10,1,sample-orders:');
 Route::post('/customer/auth/demo/request', [CustomerController::class, 'requestDemoOtp'])->middleware('throttle:20,1,demo-otp-request:');
 Route::post('/customer/auth/demo/verify', [CustomerController::class, 'verifyDemoOtp'])->middleware('throttle:30,1,demo-otp-verify:');
+Route::get('/locations', fn () => response()->json(['data' => ServiceLocations::tree()]));
+Route::post('/customer/auth/forgot-password', [CustomerPasswordController::class, 'forgot'])->middleware('throttle:5,1,customer-forgot:');
+Route::post('/customer/auth/reset-password', [CustomerPasswordController::class, 'reset'])->middleware('throttle:10,1,customer-reset:');
+Route::post('/customer/auth/login', [CustomerController::class, 'login'])->middleware('throttle:10,1,customer-login:');
+Route::post('/customer/auth/register', [CustomerController::class, 'register'])->middleware('throttle:5,1,customer-register:');
 Route::post('/customer/auth/request', [CustomerController::class, 'requestOtp'])->middleware('throttle:10,1,otp-request:');
 Route::post('/customer/auth/verify', [CustomerController::class, 'verifyOtp'])->middleware('throttle:15,1,otp-verify:');
 Route::prefix('customer')->middleware([AuthenticateCustomer::class, 'throttle:120,1'])->group(function () {
+    Route::get('/support/tickets', [SupportController::class, 'index']);
+    Route::post('/support/tickets', [SupportController::class, 'store']);
+    Route::get('/support/tickets/{id}', [SupportController::class, 'show'])->whereNumber('id');
+    Route::post('/support/tickets/{id}/messages', [SupportController::class, 'reply'])->whereNumber('id');
+    Route::post('/support/tickets/{id}/read', [SupportController::class, 'read'])->whereNumber('id');
+    Route::get('/notifications', [AppNotificationController::class, 'index']);
+    Route::patch('/notifications/{id}/read', [AppNotificationController::class, 'read'])->whereNumber('id');
+    Route::post('/notification-devices', [AppNotificationController::class, 'register']);
+    Route::delete('/notification-devices/{installation}', [AppNotificationController::class, 'unregister'])->whereUuid('installation');
+
     Route::post('/quote', [CustomerOrderController::class, 'quote']);
     Route::get('/me', [CustomerController::class, 'profile']);
     Route::patch('/me', [CustomerController::class, 'updateProfile']);
@@ -57,3 +103,5 @@ Route::prefix('customer')->middleware([AuthenticateCustomer::class, 'throttle:12
     Route::post('/orders', [CustomerOrderController::class, 'store']);
     Route::get('/orders/{reference}', [CustomerOrderController::class, 'show']);
 });
+
+Route::get('/delivery-options', fn () => response()->json(['per_km_enabled' => DeliveryZones::enabled(), 'cities' => DB::table('delivery_cities')->where('active', true)->orderBy('name')->get(['id', 'name', 'state'])]));

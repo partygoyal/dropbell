@@ -1,0 +1,4 @@
+storeFile=/absolute/path/to/dropbell-partner-upload.jks
+storePassword=replace-locally
+keyAlias=upload
+keyPassword=replace-locally

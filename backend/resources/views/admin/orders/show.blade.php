@@ -15,4 +15,16 @@ $nextStatuses = ['received'=>['picking','cancelled'], 'picking'=>['out_for_deliv
 @if(!$order->is_sample && $order->status==='delivered' && $order->payment_status==='pending')<section class="panel product-editor"><h2>Record pay-on-delivery collection</h2><form method="post" action="{{ route('admin.orders.payment',$order->id) }}">@csrf<div class="editor-grid"><label>Collection receipt / reference<input required name="reference" minlength="3" maxlength="120" placeholder="Cash receipt or collection reference"></label></div><p class="footnote">Confirm only after ₹{{ number_format($order->total_paise/100,2) }} has been collected.</p><button>Confirm payment collected →</button></form></section>@endif
 <section class="panel product-editor"><h2>Customer requests</h2>@forelse($requests as $request)<p><a class="edit-link" href="{{ route('admin.requests.show',$request->id) }}">{{ ucfirst($request->type) }} · {{ ucfirst($request->status) }} →</a></p>@empty<p>No requests for this order.</p>@endforelse</section>
 <section class="panel product-editor"><h2>Order activity</h2>@forelse($events as $event)<article><b>{{ $event->action }}</b> · {{ $event->admin_name }}<p class="footnote">{{ \Illuminate\Support\Carbon::parse($event->created_at)->timezone('Asia/Kolkata')->format('d M Y, H:i') }} IST</p>@php $details=json_decode($event->details,true); @endphp<p>{{ $details['reason'] ?? (($details['from'] ?? '').' → '.($details['to'] ?? '')) }}</p></article>@empty<p class="footnote">No administrator changes recorded yet.</p>@endforelse</section>
+<section class="panel product-editor"><h2>Rider activity</h2>
+@forelse($partnerEvents as $event)
+    @php $details = json_decode($event->details, true); @endphp
+    <article>
+        <b>{{ $event->action }}</b> · {{ $event->partner_name }}
+        <p class="footnote">{{ \Illuminate\Support\Carbon::parse($event->created_at)->timezone('Asia/Kolkata')->format('d M Y, H:i') }} IST</p>
+        @if(isset($details['stop_id']))<p>Pickup: {{ $details['stop_id'] }}</p>@endif
+        @if(isset($details['collected_paise']))<p>Collected: ₹{{ number_format($details['collected_paise'] / 100, 2) }}</p>@endif
+        @if(!empty($details['receipt']))<p>Receipt: {{ $details['receipt'] }}</p>@endif
+    </article>
+@empty<p class="footnote">No rider updates recorded yet.</p>@endforelse
+</section>
 @endsection

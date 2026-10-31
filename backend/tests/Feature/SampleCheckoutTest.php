@@ -18,15 +18,15 @@ class SampleCheckoutTest extends TestCase
         $this->seed(SampleCatalogueSeeder::class);
         $product = DB::table('products')->where('is_sample', true)->first();
 
-        return ['sample_checkout' => true, 'request_key' => (string) Str::uuid(), 'items' => [['id' => $product->id, 'quantity' => 2]], 'address' => ['name' => 'Test customer', 'phone' => '9876543210', 'street' => 'Test address', 'city' => 'Dehradun', 'pin' => '248001'], 'delivery' => 'standard', 'payment' => 'cod', 'expected_total' => $product->price_paise * 2];
+        return ['sample_checkout' => true, 'request_key' => (string) Str::uuid(), 'items' => [['id' => $product->id, 'quantity' => 2]], 'address' => ['locality_id' => $this->serviceLocality('248001'), 'name' => 'Test customer', 'phone' => '9876543210', 'street' => 'Test address', 'city' => 'Dehradun', 'pin' => '248001'], 'delivery' => 'standard', 'payment' => 'cod', 'expected_total' => $product->price_paise * 2];
     }
 
     public function test_guest_sample_cod_checkout_creates_owned_admin_order_once_and_reserves_sample_stock(): void
     {
         $payload = $this->payload();
-        $this->postJson('/api/customer/sample-quote', ['items' => $payload['items'], 'postal_code' => '248001'])->assertOk()->assertJsonPath('data.bill.total', $payload['expected_total'])->assertJsonPath('data.rules.name', 'Sample delivery (test only)');
+        $this->postJson('/api/customer/sample-quote', ['items' => $payload['items'], 'postal_code' => '248001', 'address' => $payload['address']])->assertOk()->assertJsonPath('data.bill.total', $payload['expected_total'])->assertJsonPath('data.rules.name', 'Sample delivery (test only)');
         for ($attempt = 0; $attempt < 6; $attempt++) {
-            $this->postJson('/api/customer/sample-quote', ['items' => $payload['items'], 'postal_code' => '248001'])->assertOk();
+            $this->postJson('/api/customer/sample-quote', ['items' => $payload['items'], 'postal_code' => '248001', 'address' => $payload['address']])->assertOk();
         }
         $response = $this->postJson('/api/customer/sample-orders', $payload)->assertCreated()->assertJsonPath('data.isSample', true)->assertJsonPath('data.status', 'received');
         $reference = $response->json('data.id');
@@ -75,7 +75,7 @@ class SampleCheckoutTest extends TestCase
         $productId = $payload['items'][0]['id'];
         $this->publishProduct($productId, 6000, ['248001']);
         DB::table('delivery_areas')->insert(['name' => 'Real area', 'postal_code' => '248001', 'fee_paise' => 0, 'minimum_paise' => 0, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $this->postJson('/api/customer/sample-quote', ['items' => $payload['items'], 'postal_code' => '248001'])->assertUnprocessable();
+        $this->postJson('/api/customer/sample-quote', ['items' => $payload['items'], 'postal_code' => '248001', 'address' => $payload['address']])->assertUnprocessable();
         $this->postJson('/api/customer/sample-orders', $payload)->assertUnprocessable();
         $this->assertDatabaseCount('users', 1);
         $this->assertDatabaseCount('orders', 0);

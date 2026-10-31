@@ -1,3 +1,4 @@
+import ConnectionStatus from './components/connection-status';
 import './globals.css';
 import './marketplace.css';
 
@@ -8,5 +9,5 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body><ConnectionStatus />{children}</body></html>;
 }
