@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>@yield('title', 'Dashboard') · Dropbell Admin</title><link rel="stylesheet" href="{{ asset('admin.css') }}?v=approved-logo-v1"><script src="{{ asset('admin.js') }}" defer></script><link rel="icon" type="image/svg+xml" href="{{ asset('assets/dropbell-brand-icon.svg') }}"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>@yield('title', 'Dashboard') · Dropbell Admin</title><link rel="stylesheet" href="{{ asset('admin.css') }}?v=order-tabs-v1"><script src="{{ asset('admin.js') }}?v=order-tabs-v1" defer></script><link rel="icon" type="image/svg+xml" href="{{ asset('assets/dropbell-brand-icon.svg') }}"></head>
 <body><div class="admin-shell">
 <aside class="sidebar">
 <a class="brand" href="{{ route('admin.dashboard') }}"><img class="approved-brand-logo" src="{{ asset('assets/dropbell-logo-approved.svg') }}" width="2010" height="550" alt="Dropbell"><span>ADMIN</span></a>

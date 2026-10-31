@@ -110,3 +110,50 @@
   window.addEventListener('pageshow', () => { saving = false; const button = form.querySelector('[data-vendor-save]'); button.disabled = form.querySelector('fieldset').disabled; button.textContent = 'Save availability'; });
   refresh();
 })();
+
+(() => {
+  const root = document.querySelector('[data-order-details]');
+  if (!root) return;
+  const tabs = [...root.querySelectorAll('[data-order-tab]')];
+  const panels = [...root.querySelectorAll('[data-order-panel]')];
+  const nav = root.querySelector('.order-tabs');
+  nav.setAttribute('role', 'tablist');
+  for (const tab of tabs) {
+    tab.id = `order-tab-${tab.dataset.orderTab}`;
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-controls', tab.dataset.orderTab);
+  }
+  for (const panel of panels) {
+    panel.setAttribute('role', 'tabpanel');
+    panel.setAttribute('aria-labelledby', `order-tab-${panel.dataset.orderPanel}`);
+    panel.tabIndex = 0;
+  }
+  function select(name, focus = false) {
+    if (!tabs.some(tab => tab.dataset.orderTab === name)) name = 'overview';
+    for (const tab of tabs) {
+      const active = tab.dataset.orderTab === name;
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+      if (active && focus) tab.focus();
+    }
+    for (const panel of panels) panel.hidden = panel.dataset.orderPanel !== name;
+  }
+  function activate(tab) {
+    const name = tab.dataset.orderTab;
+    history.replaceState(null, '', `#${name}`);
+    select(name, true);
+  }
+  for (const [index, tab] of tabs.entries()) {
+    tab.addEventListener('click', event => { event.preventDefault(); activate(tab); });
+    tab.addEventListener('keydown', event => {
+      let next;
+      if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+      if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+      if (event.key === 'Home') next = 0;
+      if (event.key === 'End') next = tabs.length - 1;
+      if (next !== undefined) { event.preventDefault(); activate(tabs[next]); }
+    });
+  }
+  window.addEventListener('hashchange', () => select(location.hash.slice(1)));
+  select(location.hash.slice(1));
+})();
