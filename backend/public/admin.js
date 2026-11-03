@@ -63,7 +63,8 @@
     let subtotal = [...form.querySelectorAll('[data-order-price]')].reduce((total, input) => total + Number(input.dataset.orderPrice) * Math.max(0, Number(input.value) || 0), 0);
     const addedProduct = form.elements.add_product_id.selectedOptions[0];
     subtotal += Number(addedProduct.dataset.price || 0) * Math.max(0, Number(form.elements.add_quantity.value) || 1);
-    const discount = form.dataset.discount === '1' && subtotal >= 10000 ? Math.min(5000, Math.round(subtotal * .1)) : 0;
+    const couponRules = JSON.parse(form.dataset.couponRules || 'null');
+    const discount = couponRules && subtotal >= couponRules.minimum_paise ? Math.min(subtotal, couponRules.maximum_discount_paise ?? Infinity, couponRules.discount_type === 'percent' ? Math.round(subtotal * couponRules.discount_value / 100) : couponRules.discount_value) : 0;
     const configuration = JSON.parse(form.querySelector('[data-delivery-rules]').value);
     const postalCode = form.elements['address[pin]'].value;
     const localityId = form.elements['address[locality_id]']?.value;

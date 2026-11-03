@@ -11,6 +11,7 @@ use App\Http\Middleware\AuthenticateCustomer;
 use App\Http\Middleware\AuthenticatePartner;
 use App\Services\DeliveryZones;
 use App\Services\Marketplace;
+use App\Services\Promotions;
 use App\Services\ServiceLocations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -105,3 +106,12 @@ Route::prefix('customer')->middleware([AuthenticateCustomer::class, 'throttle:12
 });
 
 Route::get('/delivery-options', fn () => response()->json(['per_km_enabled' => DeliveryZones::enabled(), 'cities' => DB::table('delivery_cities')->where('active', true)->orderBy('name')->get(['id', 'name', 'state'])]));
+
+Route::get('/promotions', fn () => response()->json(['data' => Promotions::banners()])->header('Cache-Control', 'no-store'));
+
+Route::post('/promotions/validate', function (Request $request) {
+    $input = $request->validate(['code' => 'required|string|max:30', 'subtotal' => 'required|integer|min:0|max:100000000']);
+    $rules = Promotions::resolve($input['code']);
+
+    return response()->json(['data' => ['code' => $rules['code'], 'discount' => Promotions::discount($rules, $input['subtotal'])]])->header('Cache-Control', 'no-store');
+})->middleware('throttle:60,1');

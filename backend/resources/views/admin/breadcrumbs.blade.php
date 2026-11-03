@@ -1,6 +1,6 @@
 @php
     $routeName = request()->route()?->getName() ?? '';
-    $id = request()->route('id') ?? request()->route('product') ?? request()->route('category') ?? request()->route('sub_category') ?? request()->route('delivery_partner') ?? request()->route('delivery_area');
+    $id = request()->route('id') ?? request()->route('product') ?? request()->route('category') ?? request()->route('sub_category') ?? request()->route('delivery_partner') ?? request()->route('delivery_area') ?? request()->route('promotion');
     $sections = [
         'orders' => ['Orders', 'admin.orders.index', 'Order'],
         'products' => ['Products', 'admin.products.index', 'Product'],
@@ -16,6 +16,7 @@
         'requests' => ['Customer requests', 'admin.requests.index', 'Request'],
         'transactions' => ['Transactions', 'admin.transactions.index', 'Transaction'],
         'profile' => ['My profile', 'admin.profile.edit', 'Profile'],
+        'promotions' => ['Coupons & offers', 'admin.promotions.index', 'Promotion'],
         'reports' => ['Reports', 'admin.reports.index', 'Report'],
         'support' => ['Customer support', 'admin.support.index', 'Ticket'],
     ];

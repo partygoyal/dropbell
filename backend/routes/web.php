@@ -12,6 +12,7 @@ use App\Http\Controllers\AdminOrderController;
 use App\Http\Controllers\AdminPartnerKycController;
 use App\Http\Controllers\AdminProductController;
 use App\Http\Controllers\AdminProfileController;
+use App\Http\Controllers\AdminPromotionController;
 use App\Http\Controllers\AdminReportController;
 use App\Http\Controllers\AdminSubCategoryController;
 use App\Http\Controllers\AdminVendorController;
@@ -57,6 +58,7 @@ Route::middleware([EnsureAdmin::class, 'auth.session'])->group(function () {
     Route::patch('/admin/requests/{id}', [AdminAftercareController::class, 'review'])->whereNumber('id')->name('admin.requests.review');
     Route::get('/admin/transactions', [AdminAftercareController::class, 'transactions'])->name('admin.transactions.index');
     Route::post('/admin/orders/{id}/payment', [AdminAftercareController::class, 'payment'])->whereNumber('id')->name('admin.orders.payment');
+    Route::resource('/admin/promotions', AdminPromotionController::class)->only(['index', 'create', 'store', 'edit', 'update'])->names('admin.promotions');
     Route::get('/admin/reports', [AdminReportController::class, 'index'])->name('admin.reports.index');
     Route::get('/admin/reports/export', [AdminReportController::class, 'export'])->name('admin.reports.export');
     Route::get('/admin/vendors/{id}/edit', [AdminVendorController::class, 'edit'])->whereNumber('id')->name('admin.vendors.edit');

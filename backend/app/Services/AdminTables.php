@@ -9,6 +9,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 class AdminTables
 {
     private const COLUMNS = [
+        'promotions' => ['id', 'title', 'code', 'discount_type', 'discount_value', 'active', 'show_banner', 'starts_at', 'ends_at'],
         'vendors' => ['id', 'business_name', 'owner_name', 'email', 'phone', 'city', 'postal_code', 'status', 'archived_at', 'created_at'],
         'vendor-products' => ['product_id', 'name', 'pack_size', 'price_paise', 'available', 'stock_quantity'],
         'customers' => ['id', 'name', 'phone', 'order_count', 'created_at'],

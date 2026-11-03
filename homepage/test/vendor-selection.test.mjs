@@ -20,7 +20,7 @@ function setup() {
   const elements = { '[data-vendor-select-all]': all, '[data-vendor-selected-count]': count, '[data-vendor-save-state]': state, '[data-vendor-save]': button, fieldset };
   const form = target({ querySelector: selector => elements[selector], querySelectorAll: () => checks });
   const window = target();
-  runInNewContext(script, { document: { querySelector: selector => selector === '[data-vendor-selection]' ? form : null }, window });
+  runInNewContext(script, { document: { querySelectorAll: () => [], querySelector: selector => selector === '[data-vendor-selection]' ? form : null }, window });
   return { checks, prices, all, count, state, button, form, window };
 }
 

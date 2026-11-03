@@ -8,6 +8,7 @@ use App\Services\DeliveryZones;
 use App\Services\Inventory;
 use App\Services\Marketplace;
 use App\Services\OrderAftercare;
+use App\Services\Promotions;
 use App\Services\ServiceLocations;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -185,13 +186,14 @@ class AdminOrderController extends Controller
             if ($partnerId && (int) $partnerId !== $order->delivery_partner_id && ! DB::table('delivery_partners')->where('id', $partnerId)->where('active', true)->whereExists(fn ($kyc) => $kyc->selectRaw('1')->from('delivery_partner_kycs')->whereColumn('delivery_partner_kycs.delivery_partner_id', 'delivery_partners.id')->where('status', 'approved'))->lockForUpdate()->exists()) {
                 throw ValidationException::withMessages(['delivery_partner_id' => 'Choose an active delivery partner with approved KYC.']);
             }
-            $discount = ($order->coupon_code === 'DROP10' || $order->discount_paise > 0) && $subtotal >= 10000 ? min(5000, (int) round($subtotal * .1)) : 0;
+            $couponRules = Promotions::orderRules($order);
+            $discount = Promotions::discount($couponRules, $subtotal, false);
             $sameDestination = ($input['address']['locality_id'] ?? null) == ($previousAddress['locality_id'] ?? null) && $input['address']['pin'] === $previousAddress['pin'] && ($input['address']['latitude'] ?? null) == ($previousAddress['latitude'] ?? null) && ($input['address']['longitude'] ?? null) == ($previousAddress['longitude'] ?? null);
             $rules = $sameDestination && $order->delivery_rules ? json_decode($order->delivery_rules, true) : ($order->locality_id ? DeliveryPricing::forAddress($input['address'], true) : DeliveryPricing::rules($input['address']['pin'], true));
             ServiceLocations::assertPartner($partnerId ? (int) $partnerId : null, $rules['locality_id'] ?? null);
             DeliveryZones::assertPartner($partnerId ? (int) $partnerId : null, $rules['zone_id'] ?? null);
             $delivery = DeliveryPricing::fee($rules, $subtotal);
-            $changes = ['locality_id' => $rules['locality_id'] ?? null, 'delivery_zone_id' => $rules['zone_id'] ?? null, 'coupon_code' => ($order->coupon_code === 'DROP10' || $order->discount_paise > 0) ? 'DROP10' : null, 'delivery_address' => json_encode($input['address']), 'delivery_rules' => json_encode($rules), 'delivery_preference' => $input['delivery_preference'], 'delivery_partner_id' => $partnerId, 'admin_notes' => $input['admin_notes'] ?? null, 'subtotal_paise' => $subtotal, 'discount_paise' => $discount, 'delivery_paise' => $delivery, 'total_paise' => $subtotal - $discount + $delivery, 'revision' => $order->revision + 1, 'updated_at' => now()];
+            $changes = ['locality_id' => $rules['locality_id'] ?? null, 'delivery_zone_id' => $rules['zone_id'] ?? null, 'coupon_code' => $couponRules['code'] ?? null, 'coupon_rules' => $couponRules ? json_encode($couponRules) : null, 'delivery_address' => json_encode($input['address']), 'delivery_rules' => json_encode($rules), 'delivery_preference' => $input['delivery_preference'], 'delivery_partner_id' => $partnerId, 'admin_notes' => $input['admin_notes'] ?? null, 'subtotal_paise' => $subtotal, 'discount_paise' => $discount, 'delivery_paise' => $delivery, 'total_paise' => $subtotal - $discount + $delivery, 'revision' => $order->revision + 1, 'updated_at' => now()];
             foreach ($stockChanges as $productId => $delta) {
                 if ($delta !== 0) {
                     Inventory::change($products->get($productId), -$delta, 'order_modified', $input['reason'], $request->user()->id, $id);

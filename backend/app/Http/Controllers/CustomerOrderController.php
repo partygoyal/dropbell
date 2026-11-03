@@ -8,6 +8,7 @@ use App\Services\DeliveryPricing;
 use App\Services\Inventory;
 use App\Services\Marketplace;
 use App\Services\OrderAftercare;
+use App\Services\Promotions;
 use App\Services\ServiceLocations;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,7 +48,7 @@ class CustomerOrderController extends Controller
 
     public function quote(Request $request): JsonResponse
     {
-        $input = $request->validate(['items' => 'required|array|min:1|max:100', 'items.*.id' => 'required|integer|distinct', 'items.*.quantity' => 'required|integer|min:1|max:99', 'coupon' => 'nullable|in:DROP10', 'postal_code' => ['required', 'regex:/^[1-9]\d{5}$/'], 'vendor_id' => 'nullable|integer|min:1', 'sample_checkout' => 'sometimes|boolean', 'address' => 'sometimes|array', 'address.locality_id' => 'sometimes|integer', 'address.state_id' => 'sometimes|integer', 'address.city_id' => 'sometimes|integer', 'address.city' => 'sometimes|string|max:120', 'address.latitude' => 'nullable|required_with:address.longitude|numeric|between:-90,90', 'address.longitude' => 'nullable|required_with:address.latitude|numeric|between:-180,180']);
+        $input = $request->validate(['items' => 'required|array|min:1|max:100', 'items.*.id' => 'required|integer|distinct', 'items.*.quantity' => 'required|integer|min:1|max:99', 'coupon' => 'nullable|string|max:30|regex:/^[A-Z0-9_-]+$/', 'postal_code' => ['required', 'regex:/^[1-9]\d{5}$/'], 'vendor_id' => 'nullable|integer|min:1', 'sample_checkout' => 'sometimes|boolean', 'address' => 'sometimes|array', 'address.locality_id' => 'sometimes|integer', 'address.state_id' => 'sometimes|integer', 'address.city_id' => 'sometimes|integer', 'address.city' => 'sometimes|string|max:120', 'address.latitude' => 'nullable|required_with:address.longitude|numeric|between:-90,90', 'address.longitude' => 'nullable|required_with:address.latitude|numeric|between:-180,180']);
         $input['address'] = ServiceLocations::address($input['address'] ?? []);
         $input['postal_code'] = $input['address']['pin'];
         $calculation = $this->calculate($input['items'], $input['coupon'] ?? null, $input['postal_code'], false, $request->boolean('sample_checkout'), $input['address'] ?? [], isset($input['vendor_id']) ? (int) $input['vendor_id'] : null);
@@ -114,10 +115,8 @@ class CustomerOrderController extends Controller
             }
             $subtotal += $product->price_paise * $item['quantity'];
         }
-        if (! empty($coupon) && $subtotal < 10000) {
-            throw ValidationException::withMessages(['coupon' => 'DROP10 requires an items subtotal of ₹100.']);
-        }
-        $discount = ! empty($coupon) ? min(5000, (int) round($subtotal * .1)) : 0;
+        $couponRules = Promotions::resolve($coupon, $lock);
+        $discount = Promotions::discount($couponRules, $subtotal);
         if ($isSample && $products->contains(fn ($product) => $product->vendor_offer !== null)) {
             throw ValidationException::withMessages(['items' => 'Keep sample items and real vendor products in separate orders.']);
         }
@@ -125,7 +124,7 @@ class CustomerOrderController extends Controller
         $delivery = DeliveryPricing::fee($rules, $subtotal);
         $total = $subtotal - $discount + $delivery;
 
-        return compact('products', 'subtotal', 'discount', 'delivery', 'total', 'rules', 'isSample');
+        return compact('products', 'subtotal', 'discount', 'delivery', 'total', 'rules', 'isSample', 'couponRules');
     }
 
     public function store(Request $request): JsonResponse
@@ -134,7 +133,7 @@ class CustomerOrderController extends Controller
             'vendor_id' => 'nullable|integer|min:1', 'sample_checkout' => 'sometimes|boolean', 'request_key' => 'required|uuid', 'items' => 'required|array|min:1|max:100', 'items.*.id' => 'required|integer|distinct', 'items.*.quantity' => 'required|integer|min:1|max:99',
             'address' => 'required|array', 'address.name' => 'required|string|max:120', 'address.phone' => ['required', 'regex:/^[6-9]\d{9}$/'], 'address.street' => 'required|string|max:255', 'address.locality_id' => 'required|integer', 'address.state_id' => 'sometimes|integer', 'address.city_id' => 'sometimes|integer', 'address.city' => 'nullable|string|max:120', 'address.pin' => ['nullable', 'regex:/^[1-9]\d{5}$/'],
             'address.latitude' => 'nullable|required_with:address.longitude|numeric|between:-90,90', 'address.longitude' => 'nullable|required_with:address.latitude|numeric|between:-180,180',
-            'coupon' => 'nullable|in:DROP10', 'delivery' => 'required|in:standard,evening', 'payment' => 'required|in:cod', 'expected_total' => 'required|integer|min:0',
+            'coupon' => 'nullable|string|max:30|regex:/^[A-Z0-9_-]+$/', 'delivery' => 'required|in:standard,evening', 'payment' => 'required|in:cod', 'expected_total' => 'required|integer|min:0',
         ]);
         $order = DB::transaction(function () use ($input, $request) {
             DB::table('users')->where('id', $request->user()->id)->lockForUpdate()->first();
@@ -151,7 +150,7 @@ class CustomerOrderController extends Controller
             if ($input['expected_total'] !== $total) {
                 throw ValidationException::withMessages(['expected_total' => 'Prices have changed. Refresh your bag and review the new total before placing your order.']);
             }
-            $id = DB::table('orders')->insertGetId(['locality_id' => $input['address']['locality_id'] ?? null, 'delivery_zone_id' => $rules['zone_id'] ?? null, 'is_sample' => $isSample, 'reference' => (string) Str::uuid(), 'user_id' => $request->user()->id, 'request_key' => $input['request_key'], 'delivery_address' => json_encode($input['address']), 'delivery_rules' => json_encode($rules), 'status' => 'received', 'payment_status' => 'pending', 'subtotal_paise' => $subtotal, 'discount_paise' => $discount, 'delivery_paise' => $delivery, 'total_paise' => $total, 'delivery_preference' => $input['delivery'], 'payment_method' => 'cod', 'coupon_code' => $input['coupon'] ?? null, 'created_at' => now(), 'updated_at' => now()]);
+            $id = DB::table('orders')->insertGetId(['locality_id' => $input['address']['locality_id'] ?? null, 'delivery_zone_id' => $rules['zone_id'] ?? null, 'is_sample' => $isSample, 'reference' => (string) Str::uuid(), 'user_id' => $request->user()->id, 'request_key' => $input['request_key'], 'delivery_address' => json_encode($input['address']), 'delivery_rules' => json_encode($rules), 'status' => 'received', 'payment_status' => 'pending', 'subtotal_paise' => $subtotal, 'discount_paise' => $discount, 'delivery_paise' => $delivery, 'total_paise' => $total, 'delivery_preference' => $input['delivery'], 'payment_method' => 'cod', 'coupon_code' => $input['coupon'] ?? null, 'coupon_rules' => isset($calculation['couponRules']) ? json_encode($calculation['couponRules']) : null, 'created_at' => now(), 'updated_at' => now()]);
             foreach ($input['items'] as $item) {
                 $product = $products->get($item['id']);
                 if ($product->vendor_offer) {

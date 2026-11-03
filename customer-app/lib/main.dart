@@ -1,3 +1,4 @@
+import 'promotions.dart';
 import 'dart:async';
 import 'app_recovery.dart';
 import 'package:flutter/material.dart';
@@ -783,6 +784,7 @@ class _CustomerHomeState extends State<CustomerHome> {
                 : ShopBody(
                     refresh: tab < 2 ? loadCatalogue : loadAccount,
                     children: [
+                      if (tab == 0) PromotionCarousel(api: api),
                       if (tab < 2) ...catalogueWidgets(),
                       if (tab >= 2) ...[
                         if (accountBusy) const LinearProgressIndicator(),
