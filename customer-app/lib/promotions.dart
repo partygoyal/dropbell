@@ -95,7 +95,7 @@ class _PromotionCarouselState extends State<PromotionCarousel>
       child: Column(
         children: [
           SizedBox(
-            height: 210,
+            height: 300,
             child: NotificationListener<ScrollNotification>(
               onNotification: (event) {
                 if (event is ScrollStartNotification &&
@@ -111,100 +111,25 @@ class _PromotionCarouselState extends State<PromotionCarousel>
                 onPageChanged: (value) => setState(() => index = value),
                 itemBuilder: (context, number) {
                   final offer = offers[number];
-                  final code = offer['code'] as String?;
-                  return Semantics(
-                    label: 'Offer ${number + 1} of ${offers.length}',
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEAF2FF),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFD2E1F7)),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: SingleChildScrollView(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'CURRENT OFFERS',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: blue,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    offer['title'],
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w800,
-                                      color: navy,
-                                    ),
-                                  ),
-                                  if ((offer['description'] as String?)
-                                          ?.isNotEmpty ==
-                                      true)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 8),
-                                      child: Text(
-                                        offer['description'],
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
-                                    ),
-                                  if (code != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 10),
-                                      child: OutlinedButton(
-                                        onPressed: () async {
-                                          try {
-                                            await Clipboard.setData(
-                                              ClipboardData(text: code),
-                                            );
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    '$code copied. Apply it at checkout.',
-                                                  ),
-                                                ),
-                                              );
-                                            }
-                                          } catch (_) {}
-                                        },
-                                        child: Text('Use $code · Copy'),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
+                  return _PromotionCreativeCard(
+                    offer: offer,
+                    number: number,
+                    total: offers.length,
+                    onShop: () {
+                      final position = Scrollable.maybeOf(
+                        this.context,
+                      )?.position;
+                      if (position != null) {
+                        position.animateTo(
+                          (position.pixels + 300).clamp(
+                            0.0,
+                            position.maxScrollExtent,
                           ),
-                          if (offer['image_url'] is String)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 12),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Image.network(
-                                  offer['image_url'],
-                                  width: 85,
-                                  height: 140,
-                                  fit: BoxFit.cover,
-                                  excludeFromSemantics: true,
-                                  errorBuilder: (_, _, _) =>
-                                      const SizedBox.shrink(),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
+                          duration: const Duration(milliseconds: 400),
+                          curve: Curves.easeInOut,
+                        );
+                      }
+                    },
                   );
                 },
               ),
@@ -246,6 +171,224 @@ class _PromotionCarouselState extends State<PromotionCarousel>
               ],
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _PromotionCreativeCard extends StatelessWidget {
+  const _PromotionCreativeCard({
+    required this.offer,
+    required this.number,
+    required this.total,
+    required this.onShop,
+  });
+  final Map<String, dynamic> offer;
+  final int number, total;
+  final VoidCallback onShop;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = number % 3;
+    final dark = theme == 0;
+    final ink = dark ? Colors.white : navy;
+    final accent = dark ? const Color(0xFFFFF06B) : blue;
+    final detail = offer['offer'] is Map
+        ? Map<String, dynamic>.from(offer['offer'])
+        : null;
+    final code = offer['code'] as String?;
+    final colors = [
+      [const Color(0xFF063AA7), const Color(0xFF1473FF)],
+      [const Color(0xFFFFF3B7), const Color(0xFFFFDE67)],
+      [const Color(0xFFE7FFF4), const Color(0xFFA8EBD1)],
+    ][theme];
+    return Semantics(
+      label: 'Offer ${number + 1} of $total',
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(colors: colors),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -80,
+              top: -35,
+              child: Container(
+                width: 270,
+                height: 270,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: .15),
+                    width: 25,
+                  ),
+                ),
+              ),
+            ),
+            if (offer['image_url'] is String)
+              Positioned(
+                right: -8,
+                top: 42,
+                bottom: 66,
+                width: 157,
+                child: Image.network(
+                  offer['image_url'],
+                  fit: BoxFit.contain,
+                  excludeFromSemantics: true,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(18),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      [
+                        'FRESH FINDS. BIG SAVINGS.',
+                        'YOUR EVERYDAY, FOR LESS.',
+                        'A BAG FULL OF GOOD DEALS.',
+                      ][theme],
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                        color: ink,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (detail != null) ...[
+                      Text(
+                        detail['kind'] == 'fixed' ? 'FLAT' : 'SAVE',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 2,
+                          color: ink,
+                        ),
+                      ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            detail['value'],
+                            style: TextStyle(
+                              fontSize: 62,
+                              height: 1,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -3,
+                              color: accent,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'OFF',
+                            style: TextStyle(
+                              fontSize: 27,
+                              fontWeight: FontWeight.w900,
+                              color: accent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 9),
+                    SizedBox(
+                      width: 185,
+                      child: Text(
+                        offer['title'],
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: ink,
+                        ),
+                      ),
+                    ),
+                    if (detail != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6, bottom: 12),
+                        child: SizedBox(
+                          width: 180,
+                          child: Text(
+                            [
+                              detail['minimum'],
+                              detail['maximum'],
+                            ].whereType<String>().join(' · '),
+                            style: TextStyle(
+                              fontSize: 10,
+                              height: 1.4,
+                              color: ink,
+                            ),
+                          ),
+                        ),
+                      ),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 5,
+                      children: [
+                        FilledButton(
+                          onPressed: onShop,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: dark ? accent : navy,
+                            foregroundColor: dark ? navy : Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                          ),
+                          child: const Text('Shop now ↗'),
+                        ),
+                        if (code != null)
+                          OutlinedButton(
+                            onPressed: () async {
+                              try {
+                                await Clipboard.setData(
+                                  ClipboardData(text: code),
+                                );
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '$code copied. Apply it at checkout.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } catch (_) {}
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: ink,
+                              side: BorderSide(
+                                color: ink.withValues(alpha: .5),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(7),
+                              ),
+                            ),
+                            child: Text(
+                              'CODE $code',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: .5,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

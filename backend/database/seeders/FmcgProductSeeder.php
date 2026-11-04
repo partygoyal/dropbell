@@ -10,6 +10,13 @@ class FmcgProductSeeder extends Seeder
     public function run(): void
     {
         $this->call(FmcgCategorySeeder::class);
+        $photoManifest = database_path('data/product-photos.json');
+        $photoNames = [];
+        if (is_file($photoManifest)) {
+            foreach (json_decode(file_get_contents($photoManifest), true, 512, JSON_THROW_ON_ERROR) as $photo) {
+                $photoNames[$photo['category']."\0".$photo['original_name']."\0".$photo['pack_size']] = $photo['product_name'];
+            }
+        }
         $products = [
             ['Fruits & Vegetables', 'Fresh Fruits', 'Fresh apples', '1 kg'],
             ['Fruits & Vegetables', 'Fresh Vegetables', 'Fresh potatoes', '1 kg'],
@@ -350,12 +357,13 @@ class FmcgProductSeeder extends Seeder
             ['Pet Care', 'Food for Birds & Small Pets', 'Hamster food mix', '500 g'],
         ];
 
-        DB::transaction(function () use ($products): void {
+        DB::transaction(function () use ($products, $photoNames): void {
             foreach ($products as [$category, $subCategory, $name, $pack]) {
                 $categoryId = DB::table('categories')->where('name', $category)->value('id');
                 $subCategoryId = DB::table('sub_categories')->where('category_id', $categoryId)->where('name', $subCategory)->value('id');
                 $identity = ['category' => $category, 'sub_category_id' => $subCategoryId, 'name' => $name, 'pack_size' => $pack];
-                if (! DB::table('products')->where($identity)->exists()) {
+                $names = [$name, $photoNames[$category."\0".$name."\0".$pack] ?? $name];
+                if (! DB::table('products')->where(['category' => $category, 'sub_category_id' => $subCategoryId, 'pack_size' => $pack])->whereIn('name', $names)->exists()) {
                     DB::table('products')->insert($identity + [
                         'price_paise' => 0, 'stock_quantity' => 0, 'active' => true,
                         'description' => $name.' · '.$pack.'. Check the product packaging for ingredients and manufacturer details.',

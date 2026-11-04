@@ -12,6 +12,9 @@
 <form method="post" enctype="multipart/form-data" action="{{ $record ? route('admin.'.$kind.'.update', $record->id) : route('admin.'.$kind.'.store') }}">
 @csrf @if($record) @method('PUT') @endif
 <div class="editor-grid">
+@if($kind === 'categories')
+<label class="wide">Shopping section<select name="shopping_section" required><option value="groceries" @selected(old('shopping_section', $record?->shopping_section ?? 'groceries') === 'groceries')>Groceries — shops & daily essentials</option><option value="food" @selected(old('shopping_section', $record?->shopping_section) === 'food')>Food — restaurants & prepared meals</option></select><small>Products in this category appear in the selected website section. Sub-categories inherit this setting.</small></label>
+@endif
 @if($kind === 'sub-categories')
 <label class="wide">Main category<select required name="category_id"><option value="">Select a main category</option>@foreach($categories as $category)<option value="{{ $category->id }}" @selected(old('category_id', $record?->category_id ?? request('category_id')) == $category->id)>{{ $category->name }}{{ $category->active ? '' : ' (inactive)' }}</option>@endforeach</select><small>The sub-category will appear under this main category.</small></label>
 @endif
@@ -31,7 +34,7 @@
 @forelse($rows as $category)
 @php $children = $subCategories->get($category->id, collect()); @endphp
 <details class="category-branch" @if($record && (($kind === 'categories' && $record->id === $category->id) || ($kind === 'sub-categories' && $record->category_id === $category->id))) open @endif>
-<summary>@if($category->banner_path)<img src="{{ Storage::disk('public')->url($category->banner_path) }}" alt="" loading="lazy">@else<span class="category-placeholder" aria-hidden="true">▦</span>@endif<div><b>{{ $category->name }}</b><small>{{ $children->count() }} sub-categories · {{ $category->active ? 'Active' : 'Inactive' }}</small></div><span class="category-chevron" aria-hidden="true">⌄</span></summary>
+<summary>@if($category->banner_path)<img src="{{ Storage::disk('public')->url($category->banner_path) }}" alt="" loading="lazy">@else<span class="category-placeholder" aria-hidden="true">▦</span>@endif<div><b>{{ $category->name }}</b><small>{{ $category->shopping_section === 'food' ? 'Food' : 'Groceries' }} · {{ $children->count() }} sub-categories · {{ $category->active ? 'Active' : 'Inactive' }}</small></div><span class="category-chevron" aria-hidden="true">⌄</span></summary>
 <div class="category-branch-body">
 @if($category->description)<p>{{ $category->description }}</p>@endif
 <div class="category-branch-actions"><a href="{{ route('admin.categories.edit', $category->id) }}">Edit main category</a><a href="{{ route('admin.sub-categories.index', ['category_id' => $category->id]) }}">＋ Add sub-category</a></div>

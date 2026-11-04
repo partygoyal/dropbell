@@ -1,0 +1,389 @@
+[
+  {
+    "key": "north",
+    "name": "Demo · Doon North Kitchen",
+    "cuisine": "North Indian",
+    "phone": "9000091101",
+    "dishes": [
+      {
+        "key": "paneer-butter-masala",
+        "name": "Demo · Paneer Butter Masala",
+        "category": "North Indian",
+        "subcategory": "Paneer & Curries",
+        "pack_size": "1 portion (250 g)",
+        "price_paise": 22000,
+        "image_file": "paneer-butter-masala.webp",
+        "sha256": "cebb639622d4948d85fed7bf41656440eff50a566ca018626b268e3c49e23868",
+        "photo": {
+          "name": "Paneer Butter Masala",
+          "key": "paneer-butter-masala",
+          "author": "Gannu03",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Paneer_butter_masala_2.jpg",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/1/19/Paneer_butter_masala_2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "dal-makhani",
+        "name": "Demo · Dal Makhani",
+        "category": "North Indian",
+        "subcategory": "Paneer & Curries",
+        "pack_size": "1 portion (250 g)",
+        "price_paise": 18000,
+        "image_file": "dal-makhani.webp",
+        "sha256": "159f9c0e95057850f84102eb57d754841dc79afa57a21c1b77aad9eb60bcf536",
+        "photo": {
+          "name": "Dal Makhani",
+          "key": "dal-makhani",
+          "author": "Miansari66",
+          "license": "CC0",
+          "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "https://commons.wikimedia.org/wiki/File:Dal_Makhani..JPG",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/3/3e/Dal_Makhani..JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "chole",
+        "name": "Demo · Chole Masala",
+        "category": "North Indian",
+        "subcategory": "Paneer & Curries",
+        "pack_size": "1 portion (250 g)",
+        "price_paise": 16000,
+        "image_file": "chole.webp",
+        "sha256": "bd940c1b084c8e14a2bdfbac9e283d023112bcbf1842429937dafbba398e766a",
+        "photo": {
+          "name": "Chole Masala",
+          "key": "chole",
+          "author": "Andy Li",
+          "license": "CC0",
+          "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "https://commons.wikimedia.org/wiki/File:Chana_Masala_-_Mohammed_-_Spice_Of_Life_2024-05-27.jpg",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/7/72/Chana_Masala_-_Mohammed_-_Spice_Of_Life_2024-05-27.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "butter-naan",
+        "name": "Demo · Butter Naan",
+        "category": "North Indian",
+        "subcategory": "Indian Breads",
+        "pack_size": "2 pieces",
+        "price_paise": 9000,
+        "image_file": "butter-naan.webp",
+        "sha256": "b3dbdda1c74909329cd35b887af087b234d1f16f348f2bc5b7aa9da0ae8a9ee1",
+        "photo": {
+          "name": "Butter Naan",
+          "key": "butter-naan",
+          "author": "Ganesh Mohan T",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Butter_Naan_2.jpg",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/2/29/Butter_Naan_2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "jeera-rice",
+        "name": "Demo · Jeera Rice",
+        "category": "North Indian",
+        "subcategory": "Rice & Pulao",
+        "pack_size": "1 portion (300 g)",
+        "price_paise": 12000,
+        "image_file": "jeera-rice.webp",
+        "sha256": "39be1dffd377123115a36167bc0d1a327ea43eecc94c616766875c18c0c6746e",
+        "photo": {
+          "name": "Jeera Rice",
+          "key": "jeera-rice",
+          "author": "JVRKPRASAD",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Jeera_Rice_(only).jpg",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/c/c6/Jeera_Rice_%28only%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "veg-pulao",
+        "name": "Demo · Vegetable Pulao",
+        "category": "North Indian",
+        "subcategory": "Rice & Pulao",
+        "pack_size": "1 portion (300 g)",
+        "price_paise": 14000,
+        "image_file": "veg-pulao.webp",
+        "sha256": "4d9ea6d0d04af637af08eb7abc878cec8f736853bf4e7d0f2f05bfc1e3678f23",
+        "photo": {
+          "name": "Vegetable Pulao",
+          "key": "veg-pulao",
+          "author": "Jagisnowjughead",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:VEGETABLE_PULAO_~_An_Indian_cuisine_made_from_fried_rice_mixed_with_fried_vegetables.jpg",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/8/82/VEGETABLE_PULAO_~_An_Indian_cuisine_made_from_fried_rice_mixed_with_fried_vegetables.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      }
+    ],
+    "email": "food.restaurant.north@demo.invalid"
+  },
+  {
+    "key": "south",
+    "name": "Demo · Dosa & Idli House",
+    "cuisine": "South Indian",
+    "phone": "9000091102",
+    "dishes": [
+      {
+        "key": "masala-dosa",
+        "name": "Demo · Masala Dosa",
+        "category": "South Indian",
+        "subcategory": "Dosa",
+        "pack_size": "1 dosa with chutney & sambar",
+        "price_paise": 12000,
+        "image_file": "masala-dosa.webp",
+        "sha256": "62c1c4cdc7ca57985f8f7818b159833a18ff51834bdf3ca140a1688a37a495f4",
+        "photo": {
+          "name": "Masala Dosa",
+          "key": "masala-dosa",
+          "author": "Marajozkee",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Masala_dosa_01.jpg",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/4/43/Masala_dosa_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "idli-sambar",
+        "name": "Demo · Idli Sambar",
+        "category": "South Indian",
+        "subcategory": "Idli & Vada",
+        "pack_size": "3 idlis with sambar",
+        "price_paise": 9000,
+        "image_file": "idli-sambar.webp",
+        "sha256": "23063186b46f165adfda9b5f8486f245ec67605184881362354c88997fb03c5a",
+        "photo": {
+          "name": "Idli Sambar",
+          "key": "idli-sambar",
+          "author": "Sutapa Pal",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Idli_Sambar-Noida-UP-SP004.jpg",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/0/02/Idli_Sambar-Noida-UP-SP004.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "medu-vada",
+        "name": "Demo · Medu Vada",
+        "category": "South Indian",
+        "subcategory": "Idli & Vada",
+        "pack_size": "2 pieces with chutney",
+        "price_paise": 9000,
+        "image_file": "medu-vada.webp",
+        "sha256": "8ccfcc4697c8097223f951caa0d50f508884e9b42a37a7c00cd965182b6fc336",
+        "photo": {
+          "name": "Medu Vada",
+          "key": "medu-vada",
+          "author": "Thamizhpparithi Maari",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Aesthetic_Medu_Vadai.jpg",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/c/c9/Aesthetic_Medu_Vadai.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "onion-uttapam",
+        "name": "Demo · Onion Uttapam",
+        "category": "South Indian",
+        "subcategory": "Uttapam",
+        "pack_size": "1 uttapam",
+        "price_paise": 11000,
+        "image_file": "onion-uttapam.webp",
+        "sha256": "7f2e532ece7e287817789591c21806d73ff5623ce62f2d4bef4ecf7e074ec8fc",
+        "photo": {
+          "name": "Onion Uttapam",
+          "key": "onion-uttapam",
+          "author": "Thamizhpparithi Maari",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Onion_Uttapam.jpg",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/b/b7/Onion_Uttapam.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "lemon-rice",
+        "name": "Demo · Lemon Rice",
+        "category": "South Indian",
+        "subcategory": "Rice Meals",
+        "pack_size": "1 portion (300 g)",
+        "price_paise": 11000,
+        "image_file": "lemon-rice.webp",
+        "sha256": "c30b23b8abfffbaf8245f87e1716e46c332abce12bc65f9beda59b08cc7c8bd9",
+        "photo": {
+          "name": "Lemon Rice",
+          "key": "lemon-rice",
+          "author": "Nithyasrm",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Picture_of_Lemon_rice_dish.JPG",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/b/be/Picture_of_Lemon_rice_dish.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "curd-rice",
+        "name": "Demo · Curd Rice",
+        "category": "South Indian",
+        "subcategory": "Rice Meals",
+        "pack_size": "1 portion (300 g)",
+        "price_paise": 10000,
+        "image_file": "curd-rice.webp",
+        "sha256": "3116f5db7b2ba19c559062db824936f93b30c61f9fff49a5a5dbc8267071102f",
+        "photo": {
+          "name": "Curd Rice",
+          "key": "curd-rice",
+          "author": "Sudharshan Shanmugasundaram",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Curd_Rice.jpg",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/5/58/Curd_Rice.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      }
+    ],
+    "email": "food.restaurant.south@demo.invalid"
+  },
+  {
+    "key": "chinese",
+    "name": "Demo · Wok & Bowl",
+    "cuisine": "Chinese",
+    "phone": "9000091103",
+    "dishes": [
+      {
+        "key": "veg-noodles",
+        "name": "Demo · Vegetable Hakka Noodles",
+        "category": "Chinese",
+        "subcategory": "Noodles",
+        "pack_size": "1 portion (300 g)",
+        "price_paise": 16000,
+        "image_file": "veg-noodles.webp",
+        "sha256": "43e731a3f0c0ce1445a9d85375b1d6fe810b8e36eaf4eb297d39ea72258afcae",
+        "photo": {
+          "name": "Vegetable Hakka Noodles",
+          "key": "veg-noodles",
+          "author": "Aparna Balasubramanian",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Hakka_Noodles.JPG",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/1/13/Hakka_Noodles.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "veg-fried-rice",
+        "name": "Demo · Vegetable Fried Rice",
+        "category": "Chinese",
+        "subcategory": "Fried Rice",
+        "pack_size": "1 portion (300 g)",
+        "price_paise": 15000,
+        "image_file": "veg-fried-rice.webp",
+        "sha256": "e205848f4c346fbc114e0570d9e6ea42e4e69e84fabce324250369907a9740a4",
+        "photo": {
+          "name": "Vegetable Fried Rice",
+          "key": "veg-fried-rice",
+          "author": "Nundhaa",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Vegetable_Fried_Rice.JPG",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/1/16/Vegetable_Fried_Rice.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "veg-manchurian",
+        "name": "Demo · Vegetable Manchurian",
+        "category": "Chinese",
+        "subcategory": "Chinese Starters",
+        "pack_size": "1 portion (250 g)",
+        "price_paise": 18000,
+        "image_file": "veg-manchurian.webp",
+        "sha256": "8cd5ba7e1c4be620e77df0545efaa5784808320d2a3ead58ead5230c6ce97387",
+        "photo": {
+          "name": "Vegetable Manchurian",
+          "key": "veg-manchurian",
+          "author": "Fatimahope",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Veg_manchurian_Balls.jpg",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/f/f1/Veg_manchurian_Balls.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "chilli-paneer",
+        "name": "Demo · Chilli Paneer",
+        "category": "Chinese",
+        "subcategory": "Chinese Starters",
+        "pack_size": "1 portion (250 g)",
+        "price_paise": 21000,
+        "image_file": "chilli-paneer.webp",
+        "sha256": "d3732c3780dcf99c5d0b4243b121269c340a6a2c757885bab872c712abe4b8a1",
+        "photo": {
+          "name": "Chilli Paneer",
+          "key": "chilli-paneer",
+          "author": "Arsonarfield",
+          "license": "CC BY-SA 4.0",
+          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Chilli_Paneer.JPG",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/f/f5/Chilli_Paneer.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "spring-rolls",
+        "name": "Demo · Vegetable Spring Rolls",
+        "category": "Chinese",
+        "subcategory": "Chinese Starters",
+        "pack_size": "4 pieces",
+        "price_paise": 13000,
+        "image_file": "spring-rolls.webp",
+        "sha256": "a4318d3075971acea5cd0b2935688584bac2a638128ebf04cb22738b88e1071f",
+        "photo": {
+          "name": "Vegetable Spring Rolls",
+          "key": "spring-rolls",
+          "author": "Raysonho @ Open Grid Scheduler / Grid Engine",
+          "license": "CC0",
+          "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "https://commons.wikimedia.org/wiki/File:VegetableSpringRolls.JPG",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/d/d3/VegetableSpringRolls.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      },
+      {
+        "key": "hot-sour-soup",
+        "name": "Demo · Mushroom Hot & Sour Soup",
+        "category": "Chinese",
+        "subcategory": "Soups",
+        "pack_size": "1 bowl (250 ml)",
+        "price_paise": 12000,
+        "image_file": "hot-sour-soup.webp",
+        "sha256": "9f6cc140a561b185db349b284c57cde036dc6a4a8bd0ed21380ddc2afb06b4a8",
+        "photo": {
+          "name": "Mushroom Hot & Sour Soup",
+          "key": "hot-sour-soup",
+          "author": "Stephanie from Austin TX",
+          "license": "CC BY 2.0",
+          "license_url": "https://creativecommons.org/licenses/by/2.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Vegan_Mushroom_hot_and_sour_soup_(13430868765).jpg",
+          "original": "https://upload.wikimedia.org/wikipedia/commons/d/de/Vegan_Mushroom_hot_and_sour_soup_%2813430868765%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+          "changes": "Resized and converted to WebP."
+        }
+      }
+    ],
+    "email": "food.restaurant.chinese@demo.invalid"
+  }
+]

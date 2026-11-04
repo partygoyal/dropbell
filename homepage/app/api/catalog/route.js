@@ -7,6 +7,7 @@ export async function GET(request) {
       const value = incoming.get(key) || '';
       if (/^[1-9]\d*$/.test(value)) params.set(key, value);
     }
+    if (['food', 'groceries'].includes(incoming.get('section'))) params.set('section', incoming.get('section'));
     const query = params.size ? `?${params}` : '';
     const response = await fetch(`${origin}/api/products${query}`, { cache: 'no-store', headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
     if (!response.ok) throw new Error('Catalogue unavailable');

@@ -47,7 +47,7 @@ class AdminPromotionController extends Controller
         }
         $request->merge(['code' => $request->filled('code') ? strtoupper(trim($request->input('code'))) : null]);
         $input = $request->validate([
-            'title' => 'required|string|max:120', 'description' => 'nullable|string|max:300',
+            'banner_section' => 'sometimes|in:all,food,groceries', 'title' => 'required|string|max:120', 'description' => 'nullable|string|max:300',
             'code' => ['nullable', 'required_unless:discount_type,none', 'regex:/^[A-Z0-9_-]{3,30}$/', Rule::unique('promotions')->ignore($id)],
             'discount_type' => 'required|in:none,percent,fixed', 'discount_value' => ['required_unless:discount_type,none', 'nullable', 'numeric', 'min:0.01', 'max:100000', 'decimal:0,2', ...($request->input('discount_type') === 'percent' ? ['integer', 'max:100'] : [])],
             'minimum' => 'required|numeric|min:0|max:100000|decimal:0,2', 'maximum_discount' => 'nullable|numeric|min:0.01|max:100000|decimal:0,2',
@@ -55,7 +55,7 @@ class AdminPromotionController extends Controller
             'active' => 'required|boolean', 'show_banner' => 'required|boolean', 'sort_order' => 'required|integer|min:0|max:9999',
             'starts_at' => 'nullable|date_format:Y-m-d\\TH:i', 'ends_at' => ['nullable', 'date_format:Y-m-d\\TH:i', ...($request->filled('starts_at') ? ['after:starts_at'] : [])],
         ]);
-        $row = collect($input)->only(['title', 'description', 'code', 'discount_type', 'active', 'show_banner', 'sort_order'])->all();
+        $row = collect($input)->only(['banner_section', 'title', 'description', 'code', 'discount_type', 'active', 'show_banner', 'sort_order'])->all();
         $row['code'] = $input['discount_type'] === 'none' ? null : $input['code'];
         $row['discount_value'] = $input['discount_type'] === 'none' ? 0 : (int) round($input['discount_value'] * ($input['discount_type'] === 'fixed' ? 100 : 1));
         $row['minimum_paise'] = (int) round($input['minimum'] * 100);

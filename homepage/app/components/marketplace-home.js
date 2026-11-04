@@ -1,6 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useMemo, useState } from 'react';
+import { ProductCard } from './shopping-views';
+import { homeProductGroups } from '../lib/home-products.mjs';
 import { ShopList } from './shop-browser';
 import { useRouter } from 'next/navigation';
 import { categoryImageStyle, subCategoryImageStyle } from '../lib/category-images';
@@ -45,6 +48,13 @@ const shoppingCategories = [
 
 export default function MarketplaceHome({ managedCategories, subCategories, products, Quantity, chooseFilter, vendors = [], hasLocation, onChooseLocation, catalogueReady }) {
   const router = useRouter();
+  const [homeCategory, setHomeCategory] = useState('All');
+  const [homeSearch, setHomeSearch] = useState('');
+  const [homeSort, setHomeSort] = useState('featured');
+  const [homeAvailability, setHomeAvailability] = useState('all');
+  const categoryNames = useMemo(() => [...new Set([...managedCategories.map(item => item.name), ...products.map(item => item.cat)])].filter(name => name !== 'All' && products.some(product => product.cat === name)), [managedCategories, products]);
+  const groups = useMemo(() => homeProductGroups(products, { category: homeCategory, search: homeSearch, sort: homeSort, availability: homeAvailability }).slice(0, 3), [products, homeCategory, homeSearch, homeSort, homeAvailability]);
+  const resetHomeFilters = () => { setHomeCategory('All'); setHomeSearch(''); setHomeSort('featured'); setHomeAvailability('all'); };
   const browse = item => {
     const parent = managedCategories.find(category => item.match.test(category.name))
       || (item.fallback && managedCategories.find(category => item.fallback.test(category.name)));
@@ -53,23 +63,21 @@ export default function MarketplaceHome({ managedCategories, subCategories, prod
     else chooseFilter(parent?.name || 'All');
   };
   return <div className="marketplace-home">
-    <section className="market-hero" aria-labelledby="market-hero-title">
-      <img className="market-hero-background" width="2172" height="724" src="/assets/dehradun-delivery-approved-brand.png" alt="A Dropbell delivery partner overlooking Dehradun and the Himalayas" fetchPriority="high" />
-      <div className="market-hero-inner"><div className="market-hero-copy"><MarketBrand hero />
-        <h1 id="market-hero-title"><strong>Dehradun</strong> ka apna <strong>Online Marketplace</strong></h1>
-        <p>Groceries, Fruits, Vegetables, Sweets, Dairy,<br className="desktop-break" /> Bakery, Household & More...</p>
-        <div className="market-hero-benefits"><div><MarketIcon name="shield" /><span><b>Fresh & Quality</b>Products</span></div><div><MarketIcon name="truck" /><span><b>Fast & Safe</b>Delivery</span></div><div><MarketIcon name="rupee" /><span><b>Everyday Prices</b>Local Stores</span></div></div>
-      </div><p className="market-hero-hindi" lang="hi">देहरादून की<br />हर ज़रूरत<br />अब ऑनलाइन</p></div>
-    </section>
-
     <div className="market-content">
-      <section className="market-categories" id="categories" aria-labelledby="market-categories-title"><div className="market-section-heading"><h2 id="market-categories-title">What would you like to order today?</h2><button onClick={() => chooseFilter('All')}>View All Categories <MarketIcon name="arrow" /></button></div><div className="market-category-grid">{shoppingCategories.map(item => <button key={item.label} className="market-category-card" onClick={() => browse(item)}><span className="market-category-frame"><span className="market-category-art" style={item.photo ? subCategoryImageStyle(item.art, item.photo) : categoryImageStyle(item.art)} aria-hidden="true" /></span><b>{item.label}</b></button>)}</div></section>
+      <section className="market-categories" id="categories" aria-labelledby="market-categories-title"><div className="market-section-heading"><h1 id="market-categories-title">What would you like to order today?</h1><button onClick={() => chooseFilter('All')}>View All Categories <MarketIcon name="arrow" /></button></div><div className="market-category-grid">{shoppingCategories.map(item => <button key={item.label} className="market-category-card" onClick={() => browse(item)}><span className="market-category-frame"><span className="market-category-art" style={item.photo ? subCategoryImageStyle(item.art, item.photo) : categoryImageStyle(item.art)} aria-hidden="true" /></span><b>{item.label}</b></button>)}</div></section>
 
-      <section className="market-stores" id="stores" aria-labelledby="market-stores-title"><div className="market-section-heading"><div><h2 id="market-stores-title">Local stores. Everyday favourites.</h2><p>Shop from vendors serving your delivery location.</p></div><Link href="/shops">Explore all shops →</Link></div><ShopList vendors={vendors.slice(0, 6)} hasLocation={hasLocation} onChooseLocation={onChooseLocation} ready={catalogueReady} /></section>
+      {hasLocation && <section className="market-stores" id="stores" aria-labelledby="market-stores-title"><div className="market-section-heading"><div><h2 id="market-stores-title">Local stores. Everyday favourites.</h2><p>Shop from vendors serving your delivery location.</p></div><Link href="/shops">Explore all shops →</Link></div><ShopList vendors={vendors.slice(0, 6)} hasLocation={hasLocation} onChooseLocation={onChooseLocation} ready={catalogueReady} /></section>}
 
-      <section className="market-promotions" id="offers" aria-label="Shop everyday essentials"><article className="market-promo market-promo-fresh"><div><h2>Fresh Vegetables<br />& Fruits</h2><p lang="hi">हर दिन ताज़ा, हर घर के लिए</p><button onClick={() => browse(shoppingCategories[1])}>Shop Now <MarketIcon name="arrow" /></button></div><div className="market-promo-art" style={categoryImageStyle('Fruits & Vegetables')} aria-hidden="true" /></article><article className="market-promo market-promo-grocery"><div><h2>Grocery & Daily Needs</h2><p lang="hi">आपकी रोज़मर्रा की सभी ज़रूरतें</p><button onClick={() => browse(shoppingCategories[0])}>Shop Now <MarketIcon name="arrow" /></button></div><div className="market-promo-art" style={categoryImageStyle('Atta, Rice & Pulses')} aria-hidden="true" /></article></section>
-
-      {products.length > 0 && <section className="market-products" aria-labelledby="market-products-title"><div className="market-section-heading"><h2 id="market-products-title">Your everyday essentials</h2><button onClick={() => chooseFilter('All')}>View All Products <MarketIcon name="arrow" /></button></div><div className="product-grid">{products.slice(0, 5).map(product => <article className="product" key={product.id}><Link href={`/product/${product.id}`} className="product-photo" aria-label={`View ${product.name}`}>{product.photo ? <img src={product.photo} alt={product.name} loading="lazy" /> : <span className="emoji" aria-hidden="true">{product.emoji}</span>}</Link><div className="product-body"><small>{product.cat}</small><h3><Link href={`/product/${product.id}`}>{product.name}</Link></h3><p className="quantity">{product.qty}</p><p className="product-stock">{product.sample ? `Sample price · ${product.inventory} sample packs` : product.inventory == null ? 'Stock confirmed at checkout' : `${product.inventory} packs available`}</p><div className="product-bottom"><strong>₹{product.price}</strong><Quantity product={product} /></div></div></article>)}</div></section>}
+      <section className="home-product-browser" id="products" aria-labelledby="home-products-title">
+        <div className="market-section-heading"><div><p className="eyebrow">FIND YOUR EVERYDAY</p><h2 id="home-products-title">A little of everything you need.</h2><p>Browse by category or find a favourite in seconds.</p></div><button onClick={() => chooseFilter('All')}>Explore the full catalogue <MarketIcon name="arrow" /></button></div>
+        <div className="home-product-filters">
+          <div className="home-category-pills" role="group" aria-label="Filter products by category"><button type="button" aria-pressed={homeCategory === 'All'} onClick={() => setHomeCategory('All')}>All products</button>{categoryNames.map(name => <button type="button" key={name} aria-pressed={homeCategory === name} onClick={() => setHomeCategory(name)}>{name}</button>)}</div>
+          <div className="home-filter-controls"><label className="home-filter-search">Search products<input type="search" value={homeSearch} onChange={event => setHomeSearch(event.target.value)} placeholder="Search milk, fruits, snacks…" /></label><label>Sort within categories<select value={homeSort} onChange={event => setHomeSort(event.target.value)}><option value="featured">Featured</option><option value="price-low">Price: low to high</option><option value="price-high">Price: high to low</option><option value="name">Name: A to Z</option></select></label><label>Availability<select value={homeAvailability} onChange={event => setHomeAvailability(event.target.value)}><option value="all">All products</option><option value="orderable">Real shop products</option></select></label><button type="button" className="home-filter-reset" onClick={resetHomeFilters}>Reset filters</button></div>
+        </div>
+        <p className="home-filter-count" role="status">{groups.reduce((total, group) => total + group.products.length, 0)} products across {groups.length} {groups.length === 1 ? 'category' : 'categories'}</p>
+        {groups.map(group => <section className="home-category-section" key={group.name} aria-label={group.name}><div className="market-section-heading"><div><h3>{group.name}</h3><p>{group.products.length} everyday {group.products.length === 1 ? 'essential' : 'essentials'}</p></div><button type="button" onClick={() => chooseFilter(group.name)}>View category <MarketIcon name="arrow" /></button></div><div className="home-product-row">{group.products.slice(0, 6).map(product => <ProductCard key={product.id} product={product} Quantity={Quantity} />)}</div></section>)}
+        {catalogueReady && !groups.length && <div className="home-products-empty"><h3>No products match these filters.</h3><p>Try a different category or search, or reset your filters.</p><button type="button" className="secondary" onClick={resetHomeFilters}>Show all products</button></div>}
+      </section>
 
       <section className="market-trust" aria-label="The Dropbell promise"><div><MarketIcon name="pin" /><span><b>Local Stores</b><small>Support Local Business</small></span></div><div><MarketIcon name="shield" /><span><b>Shop with Confidence</b><small>Clear prices. Easy ordering.</small></span></div><div><MarketIcon name="truck" /><span><b>Doorstep Delivery</b><small>Your everyday, made easier</small></span></div><Link href="/help"><MarketIcon name="support" /><span><b>Here to Help</b><small>Find answers & support</small></span></Link></section>
     </div>

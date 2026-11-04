@@ -47,7 +47,7 @@ class AdminCategoryController extends Controller
 
     private function persist(Request $request, ?int $id = null): RedirectResponse
     {
-        $input = $request->validate(['name' => ['required', 'string', 'max:80', Rule::unique('categories')->ignore($id)], 'active' => 'required|boolean', 'description' => 'nullable|string|max:300', 'banner' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120', 'remove_banner' => 'nullable|boolean']);
+        $input = $request->validate(['shopping_section' => 'sometimes|in:food,groceries', 'name' => ['required', 'string', 'max:80', Rule::unique('categories')->ignore($id)], 'active' => 'required|boolean', 'description' => 'nullable|string|max:300', 'banner' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120', 'remove_banner' => 'nullable|boolean']);
         if (strcasecmp($input['name'], 'All') === 0) {
             throw ValidationException::withMessages(['name' => 'All is reserved for browsing the complete catalogue. Choose another category name.']);
         }

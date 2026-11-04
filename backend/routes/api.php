@@ -42,11 +42,14 @@ Route::get('/health', function () {
 });
 
 Route::get('/products', function (Request $request) {
-    $input = $request->validate(['category' => 'nullable|string|max:80', 'q' => 'nullable|string|max:120', 'postal_code' => ['nullable', 'regex:/^[1-9]\d{5}$/'], 'locality_id' => 'nullable|integer', 'vendor_id' => 'nullable|integer|min:1']);
+    $input = $request->validate(['section' => 'nullable|in:food,groceries', 'category' => 'nullable|string|max:80', 'q' => 'nullable|string|max:120', 'postal_code' => ['nullable', 'regex:/^[1-9]\d{5}$/'], 'locality_id' => 'nullable|integer', 'vendor_id' => 'nullable|integer|min:1']);
     if (! empty($input['locality_id'])) {
         $input['postal_code'] = ServiceLocations::address(['locality_id' => $input['locality_id']])['pin'];
     }
     $query = Marketplace::publicProducts($input['postal_code'] ?? null, isset($input['vendor_id']) ? (int) $input['vendor_id'] : null);
+    if (! empty($input['section'])) {
+        $query->whereIn('products.category', DB::table('categories')->where('shopping_section', $input['section'])->select('name'));
+    }
     if (! empty($input['category'])) {
         $query->where('products.category', $input['category']);
     }
@@ -54,7 +57,14 @@ Route::get('/products', function (Request $request) {
         $query->where('products.name', 'like', '%'.$input['q'].'%');
     }
 
-    return response()->json(['vendors' => Marketplace::publicVendors($input['postal_code'] ?? null)->get(), 'categories' => DB::table('categories')->where('active', true)->orderBy('id')->get(['id', 'name']), 'sub_categories' => DB::table('sub_categories')->where('active', true)->whereIn('category_id', DB::table('categories')->where('active', true)->select('id'))->orderBy('name')->get(['id', 'name', 'category_id']), 'data' => $query->orderBy('products.id')->get()->map(fn (object $product): array => Marketplace::present($product))]);
+    $categories = DB::table('categories')->where('active', true)->when($input['section'] ?? null, fn ($q, $section) => $q->where('shopping_section', $section))->orderBy('id')->get(['id', 'name', 'shopping_section', 'banner_path'])->map(fn ($category) => (object) ['id' => $category->id, 'name' => $category->name, 'shopping_section' => $category->shopping_section, 'image_url' => $category->banner_path ? asset('storage/'.$category->banner_path) : null]);
+    $sections = $categories->pluck('shopping_section', 'name');
+    $vendorSections = Marketplace::offers($input['postal_code'] ?? null)->whereIn('vendor_products.product_id', Marketplace::catalogue()->select('products.id'))->join('products', 'products.id', '=', 'vendor_products.product_id')->join('categories', 'categories.name', '=', 'products.category')->select('vendor_products.vendor_id', 'categories.shopping_section')->selectRaw('COUNT(DISTINCT vendor_products.product_id) as product_count, MIN(products.id) as first_product_id')->groupBy('vendor_products.vendor_id', 'categories.shopping_section')->get()->groupBy('vendor_id');
+    $vendorImages = DB::table('products')->whereIn('id', $vendorSections->flatten(1)->pluck('first_product_id'))->pluck('image_path', 'id');
+    $vendorCuisines = Marketplace::offers($input['postal_code'] ?? null)->whereIn('vendor_products.product_id', Marketplace::catalogue()->select('products.id'))->join('products', 'products.id', '=', 'vendor_products.product_id')->join('categories', 'categories.name', '=', 'products.category')->where('categories.shopping_section', 'food')->select('vendor_products.vendor_id', 'categories.name')->distinct()->get()->groupBy('vendor_id');
+    $vendors = Marketplace::publicVendors($input['postal_code'] ?? null)->get()->map(fn ($vendor) => (array) $vendor + ['image_url' => ($path = $vendorImages->get(($vendorSections->get($vendor->id, collect())->firstWhere('shopping_section', 'food') ?? $vendorSections->get($vendor->id, collect())->first())?->first_product_id)) ? asset('storage/'.$path) : null, 'cuisines' => $vendorCuisines->get($vendor->id, collect())->pluck('name')->values()->all(), 'sections' => $vendorSections->get($vendor->id, collect())->pluck('shopping_section')->unique()->values()->all(), 'section_counts' => $vendorSections->get($vendor->id, collect())->pluck('product_count', 'shopping_section')->all()])->filter(fn ($vendor) => empty($input['section']) || in_array($input['section'], $vendor['sections'], true))->values();
+
+    return response()->json(['vendors' => $vendors, 'categories' => $categories, 'sub_categories' => DB::table('sub_categories')->where('active', true)->whereIn('category_id', $categories->pluck('id'))->orderBy('name')->get(['id', 'name', 'category_id']), 'data' => $query->orderBy('products.id')->get()->map(fn (object $product): array => Marketplace::present($product) + ['shopping_section' => $sections[$product->category] ?? 'groceries'])]);
 });
 Route::get('/products/{id}', function (Request $request, int $id) {
     $input = $request->validate(['postal_code' => ['nullable', 'regex:/^[1-9]\d{5}$/'], 'locality_id' => 'nullable|integer', 'vendor_id' => 'nullable|integer|min:1']);

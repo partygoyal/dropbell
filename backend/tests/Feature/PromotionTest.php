@@ -31,7 +31,7 @@ class PromotionTest extends TestCase
         Storage::disk('public')->assertExists($promotion->banner_path);
         $this->get('/admin/promotions')->assertOk()->assertSee('Weekend offer');
         $this->get('/admin/promotions/'.$promotion->id.'/edit')->assertOk();
-        $this->getJson('/api/promotions')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.code', 'WEEKEND20')->assertJsonMissingPath('data.0.discount_value');
+        $this->getJson('/api/promotions')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.code', 'WEEKEND20')->assertJsonPath('data.0.offer.value', '20%')->assertJsonPath('data.0.offer.minimum', 'On items ₹100+')->assertJsonMissingPath('data.0.discount_value');
         $this->put('/admin/promotions/'.$promotion->id, $this->input(['active' => 0, 'remove_banner' => 1]))->assertRedirect();
         Storage::disk('public')->assertMissing($promotion->banner_path);
         $this->getJson('/api/promotions')->assertJsonCount(0, 'data');

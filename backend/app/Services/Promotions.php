@@ -54,8 +54,24 @@ class Promotions
         return $order->coupon_code === 'DROP10' || $order->discount_paise > 0 ? ['code' => 'DROP10', 'discount_type' => 'percent', 'discount_value' => 10, 'minimum_paise' => 10000, 'maximum_discount_paise' => 5000] : null;
     }
 
+    private static function bannerOffer(object $promotion): ?array
+    {
+        if ($promotion->discount_type === 'none') {
+            return null;
+        }
+        $money = fn (int $paise): string => '₹'.number_format($paise / 100, $paise % 100 === 0 ? 0 : 2);
+
+        return [
+            'value' => $promotion->discount_type === 'percent' ? $promotion->discount_value.'%' : $money($promotion->discount_value),
+            'label' => 'OFF',
+            'kind' => $promotion->discount_type,
+            'minimum' => $promotion->minimum_paise > 0 ? 'On items '.$money($promotion->minimum_paise).'+' : 'On your items subtotal',
+            'maximum' => $promotion->maximum_discount_paise ? 'Save up to '.$money($promotion->maximum_discount_paise) : null,
+        ];
+    }
+
     public static function banners(): array
     {
-        return self::active()->where('show_banner', true)->orderBy('sort_order')->orderByDesc('id')->limit(20)->get()->map(fn ($row) => ['id' => $row->id, 'title' => $row->title, 'description' => $row->description, 'code' => $row->code, 'image_url' => $row->banner_path ? Storage::disk('public')->url($row->banner_path) : null, 'ends_at' => $row->ends_at])->all();
+        return self::active()->where('show_banner', true)->orderBy('sort_order')->orderByDesc('id')->limit(20)->get()->map(fn ($row) => ['id' => $row->id, 'banner_section' => $row->banner_section, 'title' => $row->title, 'description' => $row->description, 'code' => $row->code, 'offer' => self::bannerOffer($row), 'image_url' => $row->banner_path ? Storage::disk('public')->url($row->banner_path) : null, 'ends_at' => $row->ends_at])->all();
     }
 }
