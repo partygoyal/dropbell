@@ -57,6 +57,46 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets(
+    'Food carousel excludes grocery offers and retains shared offers',
+    (tester) async {
+      final api = CustomerApi(
+        baseUrl: 'https://example.test/api',
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'data': [
+                {
+                  'id': 1,
+                  'title': 'Grocery only',
+                  'banner_section': 'groceries',
+                },
+                {'id': 2, 'title': 'Food only', 'banner_section': 'food'},
+                {'id': 3, 'title': 'Shared deal', 'banner_section': 'all'},
+              ],
+            }),
+            200,
+          ),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: PromotionCarousel(api: api, section: 'food'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Food only'), findsOneWidget);
+      expect(find.text('Grocery only'), findsNothing);
+      await tester.tap(find.byTooltip('Next offer'));
+      await tester.pumpAndSettle();
+      expect(find.text('Shared deal'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      api.close();
+    },
+  );
+
   testWidgets('unavailable promotions leave shopping usable', (tester) async {
     final api = CustomerApi(
       baseUrl: 'https://example.test/api',

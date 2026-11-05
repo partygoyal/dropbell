@@ -224,16 +224,24 @@ class CustomerApi {
     await forget();
   }
 
-  Future<Catalogue> catalogue(String? pin, {String? locality}) async {
+  Future<Catalogue> catalogue(
+    String? pin, {
+    String? locality,
+    int? vendorId,
+  }) async {
     final query = pin == null
         ? ''
         : '?postal_code=${Uri.encodeQueryComponent(pin)}';
-    return Catalogue.fromJson(
-      await request(
-        'GET',
-        'products$query${locality == null ? '' : '${query.isEmpty ? '?' : '&'}locality_id=$locality'}',
-      ),
+    final result = await request(
+      'GET',
+      'products$query${locality == null ? '' : '${query.isEmpty ? '?' : '&'}locality_id=$locality'}${vendorId == null ? '' : '${query.isEmpty && locality == null ? '?' : '&'}vendor_id=$vendorId'}',
     );
+    if (vendorId != null) {
+      for (final product in result['data'] as List) {
+        product['selected_vendor_id'] = vendorId;
+      }
+    }
+    return Catalogue.fromJson(result);
   }
 
   Future<CustomerProfile> profile() async =>
@@ -270,10 +278,12 @@ class CustomerApi {
     String pin,
     String coupon, [
     Map<String, dynamic>? address,
+    int? vendorId,
   ]) async => (await request('POST', 'customer/quote', {
     'items': items,
     'postal_code': pin,
     'address': ?address,
+    'vendor_id': ?vendorId,
     'coupon': coupon.isEmpty ? null : coupon,
   }))['data'];
   Future<CustomerOrder> place(Map<String, dynamic> payload) async =>
@@ -302,8 +312,21 @@ class Product {
   int get id => json['id'];
   String get name => json['name'];
   String get category => json['category'];
+  String get section =>
+      json['shopping_section'] == 'food' ? 'food' : 'groceries';
+  int? get vendorId => json['selected_vendor_id'];
   int? get subcategory => json['sub_category_id'];
-  String get pack => json['pack_size'];
+  String get pack => [
+    json['pack_size'],
+    if ((json['selected_option_names'] as List? ?? []).isNotEmpty)
+      (json['selected_option_names'] as List).join(', '),
+  ].join(' · ');
+  List<Map<String, dynamic>> get optionGroups =>
+      (json['option_groups'] as List? ?? [])
+          .map((g) => Map<String, dynamic>.from(g))
+          .toList();
+  List<String> get optionIds =>
+      List<String>.from(json['selected_option_ids'] ?? []);
   int get price => (json['price_paise'] as num).toInt();
   String? get image => json['image_url'];
   String get description => json['description'] ?? '';
@@ -320,7 +343,18 @@ class Catalogue {
           .toList(),
       subcategories = (json['sub_categories'] as List)
           .map((e) => Map<String, dynamic>.from(e))
+          .toList(),
+      categoryDetails = (json['categories'] as List)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList(),
+      vendors = (json['vendors'] as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e))
           .toList();
+  final List<Map<String, dynamic>> categoryDetails, vendors;
+  List<String> categoriesFor(String section) => categoryDetails
+      .where((e) => (e['shopping_section'] ?? 'groceries') == section)
+      .map((e) => e['name'] as String)
+      .toList();
   final List<Product> products;
   final List<String> categories;
   final List<Map<String, dynamic>> subcategories;
@@ -385,7 +419,14 @@ class CartLine {
   CartLine(this.product, this.quantity);
   final Product product;
   final int quantity;
-  Map<String, dynamic> get item => {'id': product.id, 'quantity': quantity};
+  Map<String, dynamic> get item => {
+    'id': product.id,
+    'quantity': quantity,
+    if (product.optionGroups.isNotEmpty) 'options': product.optionIds,
+    if (product.vendorId != null) 'vendor_id': product.vendorId,
+    if (product.optionGroups.isNotEmpty)
+      'menu_revision': product.json['menu_revision'] ?? 0,
+  };
   Map<String, dynamic> get json => {
     'product': product.json,
     'quantity': quantity,
@@ -399,6 +440,11 @@ class ShoppingCart extends ChangeNotifier {
   Map<int, CartLine> lines = {};
   Set<String> consumed = {};
   bool busy = false;
+  int? get vendorId {
+    final vendors = lines.values.map((line) => line.product.vendorId).toSet();
+    return vendors.length == 1 ? vendors.first : null;
+  }
+
   int get count => lines.values.fold(0, (sum, line) => sum + line.quantity);
   int get estimate => lines.values.fold(
     0,
@@ -424,6 +470,15 @@ class ShoppingCart extends ChangeNotifier {
 
   Future<void> setQuantity(Product product, int quantity) async {
     if (busy) return;
+    if (quantity > 0 &&
+        lines.isNotEmpty &&
+        product.vendorId != vendorId &&
+        !(lines.containsKey(product.id) &&
+            lines[product.id]!.product.vendorId == product.vendorId)) {
+      throw const ApiError(
+        'Your bag belongs to another shop. Clear it before ordering from this restaurant.',
+      );
+    }
     if (quantity < 0 ||
         quantity > product.maxQuantity ||
         (quantity > 0 && !product.available)) {
@@ -459,12 +514,27 @@ class ShoppingCart extends ChangeNotifier {
     'consumed': completed.toList(),
   });
 
-  Future<void> consume(String requestKey, List<dynamic> purchased) async {
+  Future<void> consume(
+    String requestKey,
+    List<dynamic> purchased, [
+    int? purchasedVendorId,
+  ]) async {
     if (consumed.contains(requestKey)) return;
     final updated = {...lines};
     for (final item in purchased) {
+      if (vendorId != purchasedVendorId) continue;
       final line = updated[item['id']];
       if (line == null) continue;
+      if ((item['vendor_id'] ?? purchasedVendorId) != line.product.vendorId) {
+        continue;
+      }
+      final previousOptions = List<String>.from(item['options'] ?? [])..sort();
+      final currentOptions = [...line.product.optionIds]..sort();
+      if (previousOptions.join('|') != currentOptions.join('|') ||
+          (item['menu_revision'] ?? 0) !=
+              (line.product.json['menu_revision'] ?? 0)) {
+        continue;
+      }
       final remaining = line.quantity - (item['quantity'] as int);
       if (remaining <= 0) {
         updated.remove(item['id']);

@@ -29,6 +29,8 @@ class FoodDiscoverySeeder extends Seeder
             ['Street Food', 'street-food', ['Chaat', 'Samosas & Pakoras']],
         ];
         $promotions = [
+            ['THALI10', 'North Indian thali. A proper little feast.', 'Discover North Indian flavours. 10% off your items subtotal, up to ₹50, on orders of ₹199 or more. One coupon per order.', 'percent', 10, 19900, 5000, 'north-indian-thali'],
+            ['NORTH50', 'Curries, naan & a little North Indian comfort.', 'Explore comforting North Indian favourites. Flat ₹50 off your items subtotal on orders of ₹399 or more. One coupon per order.', 'fixed', 5000, 39900, 5000, 'north-indian-spread'],
             ['BITE10', 'Big flavour. A little less.', '10% off your items subtotal, up to ₹50, on orders of ₹199 or more. One coupon per order.', 'percent', 10, 19900, 5000, 'biryani'],
             ['FEAST50', 'Turn tonight into a feast.', 'Flat ₹50 off your items subtotal on orders of ₹399 or more. One coupon per order.', 'fixed', 5000, 39900, 5000, 'combo'],
             ['TREAT15', 'Make room for something sweet.', '15% off your items subtotal, up to ₹75, on orders of ₹299 or more. One coupon per order.', 'percent', 15, 29900, 7500, 'desserts'],

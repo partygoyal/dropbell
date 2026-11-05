@@ -31,8 +31,24 @@ class FoodDiscoveryTest extends TestCase
         $this->getJson('/api/products?section=groceries')->assertOk()->assertJsonCount($groceryCategories, 'categories');
         $banners = $this->getJson('/api/promotions')->assertOk()->json('data');
         $foodBanners = collect($banners)->where('banner_section', 'food');
-        $this->assertCount(3, $foodBanners);
-        $this->assertEqualsCanonicalizing(['BITE10', 'FEAST50', 'TREAT15'], $foodBanners->pluck('code')->all());
+        $this->assertCount(5, $foodBanners);
+        DB::table('promotions')->where('code', 'THALI10')->update(['show_banner' => false]);
+        $listing = $this->getJson('/api/promotions?listing=all')->assertOk()->json('data');
+        $thali = collect($listing)->firstWhere('code', 'THALI10');
+        $this->assertNotNull($thali);
+        $this->assertSame('all_items', $thali['scope']);
+        $this->assertArrayHasKey('starts_at', $thali);
+        $this->assertArrayHasKey('ends_at', $thali);
+        DB::table('promotions')->where('code', 'THALI10')->update(['active' => false]);
+        $inactiveListing = $this->getJson('/api/promotions?listing=all')->assertOk()->json('data');
+        $this->assertNull(collect($inactiveListing)->firstWhere('code', 'THALI10'));
+        DB::table('promotions')->where('code', 'THALI10')->update(['active' => true]);
+
+        $this->assertEqualsCanonicalizing(['BITE10', 'FEAST50', 'TREAT15', 'THALI10', 'NORTH50'], $foodBanners->pluck('code')->all());
+        $this->assertSame(5000, Promotions::discount(Promotions::resolve('THALI10'), 100000));
+        $this->assertSame(5000, Promotions::discount(Promotions::resolve('NORTH50'), 39900));
+        $this->postJson('/api/promotions/validate', ['code' => 'NORTH50', 'subtotal' => 39899])->assertUnprocessable();
+        $this->postJson('/api/promotions/validate', ['code' => 'THALI10', 'subtotal' => 19899])->assertUnprocessable();
         $this->assertSame(5000, Promotions::discount(Promotions::resolve('BITE10'), 100000));
         $this->assertSame(5000, Promotions::discount(Promotions::resolve('FEAST50'), 39900));
         $this->assertSame(7500, Promotions::discount(Promotions::resolve('TREAT15'), 100000));
@@ -47,7 +63,7 @@ class FoodDiscoveryTest extends TestCase
         DB::table('promotions')->where('code', 'BITE10')->update(['title' => 'Admin campaign title', 'active' => false, 'discount_value' => 5]);
         $this->seed(FoodDiscoverySeeder::class);
         $this->assertSame(16, DB::table('categories')->where('shopping_section', 'food')->count());
-        $this->assertSame(3, DB::table('promotions')->where('banner_section', 'food')->count());
+        $this->assertSame(5, DB::table('promotions')->where('banner_section', 'food')->count());
         $this->assertDatabaseHas('categories', ['name' => 'Biryani', 'description' => 'Admin description', 'active' => false, 'banner_path' => 'custom-food.jpg']);
         $this->assertDatabaseHas('promotions', ['code' => 'BITE10', 'title' => 'Admin campaign title', 'active' => false, 'discount_value' => 5]);
     }

@@ -99,3 +99,13 @@ body>.floating-table-actions{position:fixed;z-index:1000;width:220px;max-width:c
 @media(max-width:650px){.dashboard>header{flex-wrap:wrap}.dashboard>header>.admin-breadcrumbs{flex-basis:100%}.admin-top-actions{margin-left:auto}.admin-account-name{max-width:130px}}
 
 .vendor-sound-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:18px 22px;margin-top:24px;background:#eef4ff;border:1px solid #dce6f4;border-radius:10px;font-size:12px}.vendor-sound-controls>div{flex:1;min-width:200px}.vendor-sound-controls p{margin:5px 0 0;color:#526580;font-size:11px}.vendor-sound-controls button[hidden]{display:none}
+
+.vendor-operations-panel{padding:22px;display:grid;gap:18px}
+.vendor-operations-panel .panel-heading{padding:0;border:0;margin:0}
+.vendor-operations-panel>p{margin:0;line-height:1.65}
+.vendor-operations-panel form.product-editor{padding:0;margin:0}
+.vendor-operations-panel fieldset{border:0;padding:0;margin:0;min-width:0;display:grid;gap:18px}
+.vendor-operations-panel summary{cursor:pointer;font-weight:700;padding:10px 0}
+.vendor-operations-panel input[type=time]{min-width:110px}
+.vendor-operations-panel .action{justify-self:start}
+@media(max-width:600px){.vendor-operations-panel{padding:18px}}

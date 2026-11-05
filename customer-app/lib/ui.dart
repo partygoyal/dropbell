@@ -264,10 +264,12 @@ class CategoryTile extends StatelessWidget {
     required this.name,
     required this.onTap,
     this.large = false,
+    this.imageUrl,
   });
   final String name;
   final VoidCallback onTap;
   final bool large;
+  final String? imageUrl;
   @override
   Widget build(BuildContext context) => Material(
     color: large ? Colors.white : Colors.transparent,
@@ -285,12 +287,23 @@ class CategoryTile extends StatelessWidget {
         child: Column(
           children: [
             LayoutBuilder(
-              builder: (context, constraints) => CategoryPicture(
-                categoryPicture(name),
-                size: constraints.maxWidth
-                    .clamp(44, large ? 104 : 64)
-                    .toDouble(),
-              ),
+              builder: (context, constraints) => imageUrl != null
+                  ? SizedBox(
+                      height: large ? 104 : 64,
+                      width: large ? 104 : 64,
+                      child: Image.network(
+                        imageUrl!,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) =>
+                            const Icon(Icons.restaurant, color: blue),
+                      ),
+                    )
+                  : CategoryPicture(
+                      categoryPicture(name),
+                      size: constraints.maxWidth
+                          .clamp(44, large ? 104 : 64)
+                          .toDouble(),
+                    ),
             ),
             const SizedBox(height: 8),
             Text(

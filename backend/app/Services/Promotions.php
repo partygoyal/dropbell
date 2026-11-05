@@ -70,6 +70,18 @@ class Promotions
         ];
     }
 
+    public static function listing(): array
+    {
+        return self::active()->orderBy('sort_order')->orderByDesc('id')->get()->map(fn ($row) => [
+            'id' => $row->id, 'title' => $row->title, 'description' => $row->description,
+            'code' => $row->code, 'offer' => self::bannerOffer($row),
+            'banner_section' => $row->banner_section,
+            'image_url' => $row->banner_path ? Storage::disk('public')->url($row->banner_path) : null,
+            'starts_at' => $row->starts_at, 'ends_at' => $row->ends_at,
+            'scope' => 'all_items',
+        ])->all();
+    }
+
     public static function banners(): array
     {
         return self::active()->where('show_banner', true)->orderBy('sort_order')->orderByDesc('id')->limit(20)->get()->map(fn ($row) => ['id' => $row->id, 'banner_section' => $row->banner_section, 'title' => $row->title, 'description' => $row->description, 'code' => $row->code, 'offer' => self::bannerOffer($row), 'image_url' => $row->banner_path ? Storage::disk('public')->url($row->banner_path) : null, 'ends_at' => $row->ends_at])->all();

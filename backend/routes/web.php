@@ -14,10 +14,12 @@ use App\Http\Controllers\AdminProductController;
 use App\Http\Controllers\AdminProfileController;
 use App\Http\Controllers\AdminPromotionController;
 use App\Http\Controllers\AdminReportController;
+use App\Http\Controllers\AdminReviewController;
 use App\Http\Controllers\AdminSubCategoryController;
 use App\Http\Controllers\AdminVendorController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\VendorAuthController;
+use App\Http\Controllers\VendorMenuController;
 use App\Http\Controllers\VendorPortalController;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureVendor;
@@ -30,6 +32,11 @@ Route::post('/vendor/login', [VendorAuthController::class, 'login'])->middleware
 Route::get('/vendor/register', [VendorAuthController::class, 'registerForm'])->name('vendor.register');
 Route::post('/vendor/register', [VendorAuthController::class, 'register'])->middleware('throttle:5,1');
 Route::middleware(EnsureVendor::class)->group(function () {
+    Route::get('/vendor/menu/{id}', [VendorMenuController::class, 'edit'])->whereNumber('id')->name('vendor.menu.edit');
+    Route::put('/vendor/menu/{id}', [VendorMenuController::class, 'save'])->whereNumber('id')->name('vendor.menu.save');
+    Route::put('/vendor/operations', [VendorPortalController::class, 'saveOperations'])->name('vendor.operations.save');
+    Route::post('/vendor/orders/{id}/reject', [VendorPortalController::class, 'rejectOrder'])->whereNumber('id')->name('vendor.orders.reject');
+    Route::post('/vendor/orders/{id}/preparation', [VendorPortalController::class, 'prepareOrder'])->whereNumber('id')->name('vendor.orders.preparation');
     Route::get('/vendor/order-alerts', [VendorPortalController::class, 'orderAlerts'])->name('vendor.order-alerts');
     Route::get('/vendor', [VendorPortalController::class, 'dashboard'])->name('vendor.dashboard');
     Route::get('/vendor/onboarding', [VendorPortalController::class, 'onboarding'])->name('vendor.onboarding');
@@ -40,6 +47,8 @@ Route::middleware(EnsureVendor::class)->group(function () {
     Route::post('/vendor/logout', [VendorAuthController::class, 'logout'])->name('vendor.logout');
 });
 Route::middleware([EnsureAdmin::class, 'auth.session'])->group(function () {
+    Route::get('/admin/reviews', [AdminReviewController::class, 'index'])->name('admin.reviews.index');
+    Route::patch('/admin/reviews/{id}', [AdminReviewController::class, 'update'])->whereNumber('id')->name('admin.reviews.update');
     Route::get('/admin/profile', [AdminProfileController::class, 'edit'])->name('admin.profile.edit');
     Route::put('/admin/profile', [AdminProfileController::class, 'update'])->name('admin.profile.update');
     Route::put('/admin/profile/password', [AdminProfileController::class, 'password'])->middleware('throttle:6,1')->name('admin.profile.password');

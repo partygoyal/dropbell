@@ -9,6 +9,7 @@
 <a @class(['selected' => (request()->routeIs($pattern) || ($destination === 'admin.categories.index' && request()->routeIs('admin.sub-categories.*')) || ($destination === 'admin.delivery-partners.index' && request()->routeIs('admin.partner-kyc.*')))]) @if((request()->routeIs($pattern) || ($destination === 'admin.categories.index' && request()->routeIs('admin.sub-categories.*')) || ($destination === 'admin.delivery-partners.index' && request()->routeIs('admin.partner-kyc.*')))) aria-current="page" @endif href="{{ route($destination) }}"><span class="nav-icon" aria-hidden="true">{{ $icon }}</span>{{ $label }}</a>
 @endforeach
 
+<a href="{{ route('admin.reviews.index') }}" @class(['selected'=>request()->routeIs('admin.reviews.*')])><span class="nav-icon" aria-hidden="true">★</span>Review moderation</a>
 <script>
 (() => {
     const sidebar = document.currentScript.closest('.sidebar');

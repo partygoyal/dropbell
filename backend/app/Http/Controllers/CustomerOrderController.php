@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\AppNotifications;
+use App\Services\DeliveryEstimates;
 use App\Services\DeliveryPricing;
 use App\Services\Inventory;
 use App\Services\Marketplace;
+use App\Services\MenuChoices;
 use App\Services\OrderAftercare;
 use App\Services\Promotions;
 use App\Services\ServiceLocations;
@@ -21,9 +23,12 @@ class CustomerOrderController extends Controller
 {
     public static function present(object $order): array
     {
-        $items = DB::table('order_items')->where('order_id', $order->id)->get()->map(fn ($item) => ['id' => $item->product_id, 'name' => $item->product_name, 'qty' => $item->pack_size, 'price' => $item->unit_price_paise / 100, 'quantity' => $item->quantity]);
+        $items = DB::table('order_items')->where('order_id', $order->id)->get()->map(fn ($item) => ['id' => $item->product_id, 'name' => $item->product_name, 'qty' => $item->pack_size, 'price' => $item->unit_price_paise / 100, 'quantity' => $item->quantity, 'options' => json_decode($item->selected_options ?? '[]', true)]);
 
-        return ['isSample' => (bool) $order->is_sample, 'id' => $order->reference, 'createdAt' => Carbon::parse($order->created_at)->toISOString(), 'status' => $order->status, 'stage' => array_search($order->status, ['received', 'picking', 'out_for_delivery', 'delivered'], true) ?: 0, 'address' => json_decode($order->delivery_address, true), 'delivery' => $order->delivery_preference === 'evening' ? 'Evening delivery' : 'Next available delivery', 'payment' => 'Pay on delivery · '.$order->payment_status, 'paymentStatus' => $order->payment_status, 'invoiceAvailable' => ! $order->is_sample && $order->status === 'delivered', 'requests' => DB::table('customer_requests')->where('order_id', $order->id)->orderByDesc('id')->get()->map(fn ($row) => OrderAftercare::presentRequest($row)), 'refunded' => (int) DB::table('order_transactions')->where('order_id', $order->id)->where('type', 'refund')->where('status', 'completed')->sum('amount_paise'), 'items' => $items, 'deliveryPricing' => self::deliveryPricing($order), 'bill' => ['subtotal' => $order->subtotal_paise, 'discount' => $order->discount_paise, 'delivery' => $order->delivery_paise, 'total' => $order->total_paise]];
+        $vendorReviewRequired = (bool) ($order->vendor_rejection_reason && DB::table('customer_requests')->where('order_id', $order->id)->where('type', 'cancellation')->where('status', 'requested')->exists());
+        $estimatedReady = DB::table('order_items')->where('order_id', $order->id)->whereNull('vendor_ready_at')->max('estimated_ready_at');
+
+        return ['deliveryEstimate' => DeliveryEstimates::present($order), 'vendorReviewRequired' => $vendorReviewRequired, 'vendorRejectionReason' => $order->vendor_rejection_reason, 'estimatedReadyAt' => ! $vendorReviewRequired && in_array($order->status, ['received', 'picking'], true) && $estimatedReady ? Carbon::parse($estimatedReady)->toISOString() : null, 'isSample' => (bool) $order->is_sample, 'id' => $order->reference, 'createdAt' => Carbon::parse($order->created_at)->toISOString(), 'status' => $order->status, 'stage' => array_search($order->status, ['received', 'picking', 'out_for_delivery', 'delivered'], true) ?: 0, 'address' => json_decode($order->delivery_address, true), 'delivery' => $order->delivery_preference === 'evening' ? 'Evening delivery' : 'Next available delivery', 'payment' => 'Pay on delivery · '.$order->payment_status, 'paymentStatus' => $order->payment_status, 'invoiceAvailable' => ! $order->is_sample && $order->status === 'delivered', 'requests' => DB::table('customer_requests')->where('order_id', $order->id)->orderByDesc('id')->get()->map(fn ($row) => OrderAftercare::presentRequest($row)), 'refunded' => (int) DB::table('order_transactions')->where('order_id', $order->id)->where('type', 'refund')->where('status', 'completed')->sum('amount_paise'), 'items' => $items, 'deliveryPricing' => self::deliveryPricing($order), 'bill' => ['subtotal' => $order->subtotal_paise, 'discount' => $order->discount_paise, 'delivery' => $order->delivery_paise, 'total' => $order->total_paise]];
     }
 
     public static function deliveryPricing(object $order): array
@@ -48,7 +53,7 @@ class CustomerOrderController extends Controller
 
     public function quote(Request $request): JsonResponse
     {
-        $input = $request->validate(['items' => 'required|array|min:1|max:100', 'items.*.id' => 'required|integer|distinct', 'items.*.quantity' => 'required|integer|min:1|max:99', 'coupon' => 'nullable|string|max:30|regex:/^[A-Z0-9_-]+$/', 'postal_code' => ['required', 'regex:/^[1-9]\d{5}$/'], 'vendor_id' => 'nullable|integer|min:1', 'sample_checkout' => 'sometimes|boolean', 'address' => 'sometimes|array', 'address.locality_id' => 'sometimes|integer', 'address.state_id' => 'sometimes|integer', 'address.city_id' => 'sometimes|integer', 'address.city' => 'sometimes|string|max:120', 'address.latitude' => 'nullable|required_with:address.longitude|numeric|between:-90,90', 'address.longitude' => 'nullable|required_with:address.latitude|numeric|between:-180,180']);
+        $input = $request->validate(['items' => 'required|array|min:1|max:100', 'items.*.id' => 'required|integer|distinct', 'items.*.quantity' => 'required|integer|min:1|max:99', 'items.*.options' => 'sometimes|array|max:18', 'items.*.options.*' => 'string|max:40', 'items.*.menu_revision' => 'nullable|integer|min:0', 'items.*.vendor_id' => 'nullable|integer|min:1', 'coupon' => 'nullable|string|max:30|regex:/^[A-Z0-9_-]+$/', 'postal_code' => ['required', 'regex:/^[1-9]\d{5}$/'], 'vendor_id' => 'nullable|integer|min:1', 'sample_checkout' => 'sometimes|boolean', 'address' => 'sometimes|array', 'address.locality_id' => 'sometimes|integer', 'address.state_id' => 'sometimes|integer', 'address.city_id' => 'sometimes|integer', 'address.city' => 'sometimes|string|max:120', 'address.latitude' => 'nullable|required_with:address.longitude|numeric|between:-90,90', 'address.longitude' => 'nullable|required_with:address.latitude|numeric|between:-180,180']);
         $input['address'] = ServiceLocations::address($input['address'] ?? []);
         $input['postal_code'] = $input['address']['pin'];
         $calculation = $this->calculate($input['items'], $input['coupon'] ?? null, $input['postal_code'], false, $request->boolean('sample_checkout'), $input['address'] ?? [], isset($input['vendor_id']) ? (int) $input['vendor_id'] : null);
@@ -109,8 +114,16 @@ class CustomerOrderController extends Controller
                 $isSample = true;
                 $product->vendor_offer = null;
             } else {
-                $offer = Marketplace::selectOffer($product->id, $postalCode, $lock, $item['quantity'], $vendorId);
-                $product->price_paise = $offer->price_paise;
+                if ($vendorId !== null && ! empty($item['vendor_id']) && (int) $item['vendor_id'] !== $vendorId) {
+                    throw ValidationException::withMessages(['items' => 'The selected item belongs to another shop.']);
+                }
+                $offer = Marketplace::selectOffer($product->id, $postalCode, $lock, $item['quantity'], $vendorId ?? ($item['vendor_id'] ?? null));
+                if (isset($item['menu_revision']) && (int) $item['menu_revision'] !== (int) $offer->menu_revision) {
+                    throw ValidationException::withMessages(['items' => 'The menu options changed. Select them again before ordering.']);
+                }
+                $custom = MenuChoices::resolve($offer, $item['options'] ?? []);
+                $product->selected_options = $custom['choices'];
+                $product->price_paise = $offer->price_paise + $custom['extra'];
                 $product->vendor_offer = $offer;
             }
             $subtotal += $product->price_paise * $item['quantity'];
@@ -130,7 +143,7 @@ class CustomerOrderController extends Controller
     public function store(Request $request): JsonResponse
     {
         $input = $request->validate([
-            'vendor_id' => 'nullable|integer|min:1', 'sample_checkout' => 'sometimes|boolean', 'request_key' => 'required|uuid', 'items' => 'required|array|min:1|max:100', 'items.*.id' => 'required|integer|distinct', 'items.*.quantity' => 'required|integer|min:1|max:99',
+            'vendor_id' => 'nullable|integer|min:1', 'sample_checkout' => 'sometimes|boolean', 'request_key' => 'required|uuid', 'items' => 'required|array|min:1|max:100', 'items.*.id' => 'required|integer|distinct', 'items.*.quantity' => 'required|integer|min:1|max:99', 'items.*.options' => 'sometimes|array|max:18', 'items.*.options.*' => 'string|max:40', 'items.*.menu_revision' => 'nullable|integer|min:0', 'items.*.vendor_id' => 'nullable|integer|min:1',
             'address' => 'required|array', 'address.name' => 'required|string|max:120', 'address.phone' => ['required', 'regex:/^[6-9]\d{9}$/'], 'address.street' => 'required|string|max:255', 'address.locality_id' => 'required|integer', 'address.state_id' => 'sometimes|integer', 'address.city_id' => 'sometimes|integer', 'address.city' => 'nullable|string|max:120', 'address.pin' => ['nullable', 'regex:/^[1-9]\d{5}$/'],
             'address.latitude' => 'nullable|required_with:address.longitude|numeric|between:-90,90', 'address.longitude' => 'nullable|required_with:address.latitude|numeric|between:-180,180',
             'coupon' => 'nullable|string|max:30|regex:/^[A-Z0-9_-]+$/', 'delivery' => 'required|in:standard,evening', 'payment' => 'required|in:cod', 'expected_total' => 'required|integer|min:0',
@@ -158,7 +171,7 @@ class CustomerOrderController extends Controller
                 } else {
                     Inventory::change($product, -$item['quantity'], 'sample_order', 'Stock reserved for a test COD order.', null, $id);
                 }
-                DB::table('order_items')->insert(($product->vendor_offer ? Marketplace::snapshot($product->vendor_offer) : []) + ['order_id' => $id, 'product_id' => $product->id, 'product_name' => $product->name, 'pack_size' => $product->pack_size, 'unit_price_paise' => $product->price_paise, 'quantity' => $item['quantity'], 'created_at' => now(), 'updated_at' => now()]);
+                DB::table('order_items')->insert(($product->vendor_offer ? Marketplace::snapshot($product->vendor_offer) : []) + ['selected_options' => json_encode($product->selected_options ?? []), 'order_id' => $id, 'product_id' => $product->id, 'product_name' => $product->name, 'pack_size' => $product->pack_size, 'unit_price_paise' => $product->price_paise, 'quantity' => $item['quantity'], 'created_at' => now(), 'updated_at' => now()]);
             }
 
             $order = DB::table('orders')->find($id);

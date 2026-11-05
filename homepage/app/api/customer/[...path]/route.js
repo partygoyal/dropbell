@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-const allowed = /^(auth\/(forgot-password|reset-password|login|register|request|verify|demo\/(?:request|verify))|support\/tickets(?:\/\d+(?:\/(?:messages|read))?)?|me|logout|quote|sample-quote|sample-orders|addresses(?:\/\d+)?|requests|transactions|orders(?:\/[a-zA-Z0-9-]+(?:\/(?:requests|invoice))?)?)$/;
+const allowed = /^(auth\/(forgot-password|reset-password|login|register|request|verify|demo\/(?:request|verify))|support\/tickets(?:\/\d+(?:\/(?:messages|read))?)?|favourites|me|logout|quote|sample-quote|sample-orders|addresses(?:\/\d+)?|requests|transactions|orders(?:\/[a-zA-Z0-9-]+(?:\/(?:requests|invoice|reorder|reviews|tracking))?)?)$/;
 async function proxy(request, { params }) {
   const { path } = await params;
   const endpoint = path.join('/');

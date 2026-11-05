@@ -236,6 +236,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
         address!.pin,
         coupon.text.trim().toUpperCase(),
         address!.payload,
+        widget.cart.vendorId,
       );
       if (mounted) setState(() => quote = result);
     } catch (e) {
@@ -297,6 +298,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
         pending ??
             {
               'items': lines.map((e) => e.item).toList(),
+              'vendor_id': ?widget.cart.vendorId,
               'address': address!.payload,
               'coupon': coupon.text.trim().isEmpty
                   ? null
@@ -319,6 +321,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
         await widget.cart.consume(
           attempt.pending!['request_key'],
           attempt.pending!['items'],
+          attempt.pending!['vendor_id'],
         );
         await attempt.finish();
       } catch (_) {
@@ -621,6 +624,7 @@ class _BagDeliveryPreviewState extends State<BagDeliveryPreview> {
         address!.pin,
         '',
         address!.payload,
+        widget.cart.vendorId,
       );
       if (mounted && current == generation) setState(() => quote = result);
     } catch (e) {

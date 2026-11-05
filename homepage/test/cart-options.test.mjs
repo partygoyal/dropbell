@@ -1,0 +1,6 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {saveCartWithOptions,readCartOptions,consumeCheckout,switchCartVendor,readCart} from '../app/lib/cart-storage.mjs';
+const storage=()=>{const data=new Map();return {getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)};};
+test('menu options and quantities persist together and switching shops clears both',()=>{const s=storage();switchCartVendor(s,7);saveCartWithOptions(s,{10:2},{10:{ids:['large'],vendorId:7,menuRevision:1,extra:5000}});assert.deepEqual(readCart(s),{10:2});assert.equal(readCartOptions(s)[10].extra,5000);switchCartVendor(s,8);assert.deepEqual(readCartOptions(s),{});assert.deepEqual(readCart(s),{});});
+test('recovery does not consume a replacement menu configuration or revision',()=>{const s=storage();switchCartVendor(s,7);saveCartWithOptions(s,{10:1},{10:{ids:['large'],menuRevision:2}});consumeCheckout(s,'old',[{id:10,quantity:1,options:['regular'],menu_revision:1}],7);assert.deepEqual(readCart(s),{10:1});consumeCheckout(s,'old-version',[{id:10,quantity:1,options:['large'],menu_revision:1}],7);assert.deepEqual(readCart(s),{10:1});consumeCheckout(s,'new',[{id:10,quantity:1,options:['large'],menu_revision:2}],7);assert.deepEqual(readCart(s),{});assert.deepEqual(readCartOptions(s),{});});

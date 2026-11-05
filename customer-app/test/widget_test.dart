@@ -803,6 +803,8 @@ void main() {
         expect(find.byTooltip('Open bag'), findsOneWidget);
         expect(api.signedIn, isFalse);
         expect(find.byType(ProductTile), findsNothing);
+        await tester.tap(find.byKey(const ValueKey('section-groceries')));
+        await tester.pumpAndSettle();
         expect(find.text('Shop by category'), findsOneWidget);
         expect(
           tester.getTopLeft(find.text('Choose location')).dy,
@@ -813,10 +815,10 @@ void main() {
           'Milk',
         );
         await tester.pumpAndSettle();
-        expect(find.byType(ProductTile), findsNothing);
+        expect(find.byType(ProductTile), findsOneWidget);
         expect(
           find.text('No matching categories. Try another search.'),
-          findsOneWidget,
+          findsNothing,
         );
         await tester.enterText(
           find.widgetWithText(TextField, 'Search categories'),

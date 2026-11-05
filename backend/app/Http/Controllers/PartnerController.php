@@ -151,13 +151,14 @@ class PartnerController extends Controller
         $items = DB::table('order_items')->where('order_id', $order->id)->orderBy('id')->get();
         $stops = $items->groupBy(fn ($item) => $item->vendor_id ? 'vendor-'.$item->vendor_id : 'hub')->map(function ($items, $key) {
             $first = $items->first();
+            $requiresPreparation = $items->contains(fn ($item) => $item->vendor_accepted_at !== null) || DB::table('products')->whereIn('id', $items->pluck('product_id'))->whereIn('category', DB::table('categories')->where('shopping_section', 'food')->select('name'))->exists();
             $vendorPhone = $first->vendor_id ? DB::table('vendors')->join('users', 'users.id', '=', 'vendors.user_id')->where('vendors.id', $first->vendor_id)->value('users.phone') : null;
 
-            return ['id' => $key, 'name' => $first->vendor_name ?: 'Dropbell pickup hub', 'address' => $first->pickup_address ? json_decode($first->pickup_address, true) : null, 'phone' => $vendorPhone, 'picked_up' => $items->every(fn ($item) => $item->picked_up_at !== null), 'items' => $items->map(fn ($item) => ['id' => $item->id, 'name' => $item->product_name, 'pack_size' => $item->pack_size, 'quantity' => $item->quantity])->values()];
+            return ['requires_preparation' => $requiresPreparation, 'pickup_ready' => ! $requiresPreparation || $items->every(fn ($item) => $item->vendor_ready_at !== null), 'preparation_status' => $items->every(fn ($item) => $item->vendor_ready_at !== null) ? 'ready' : ($items->every(fn ($item) => $item->vendor_accepted_at !== null) ? 'preparing' : 'awaiting_vendor'), 'id' => $key, 'name' => $first->vendor_name ?: 'Dropbell pickup hub', 'address' => $first->pickup_address ? json_decode($first->pickup_address, true) : null, 'phone' => $vendorPhone, 'picked_up' => $items->every(fn ($item) => $item->picked_up_at !== null), 'items' => $items->map(fn ($item) => ['id' => $item->id, 'name' => $item->product_name, 'pack_size' => $item->pack_size, 'quantity' => $item->quantity, 'options' => json_decode($item->selected_options ?? '[]', true)])->values()];
         })->values();
         $payment = DB::table('order_transactions')->where('operation_key', 'payment:'.$order->id)->first();
 
-        return ['reference' => $order->reference, 'revision' => $order->revision, 'status' => $order->status, 'address' => json_decode($order->delivery_address, true), 'cod_paise' => $order->payment_status === 'paid' ? 0 : $order->total_paise, 'total_paise' => $order->total_paise, 'receipt' => $payment?->reference, 'delivered_at' => $order->delivered_at ? Carbon::parse($order->delivered_at)->toIso8601String() : null, 'stops' => $stops];
+        return ['vendor_review_required' => (bool) ($order->vendor_rejection_reason && DB::table('customer_requests')->where('order_id', $order->id)->where('type', 'cancellation')->where('status', 'requested')->exists()), 'reference' => $order->reference, 'revision' => $order->revision, 'status' => $order->status, 'address' => json_decode($order->delivery_address, true), 'cod_paise' => $order->payment_status === 'paid' ? 0 : $order->total_paise, 'total_paise' => $order->total_paise, 'receipt' => $payment?->reference, 'delivered_at' => $order->delivered_at ? Carbon::parse($order->delivered_at)->toIso8601String() : null, 'stops' => $stops];
     }
 
     public function pickup(Request $request, string $reference): JsonResponse
@@ -175,6 +176,7 @@ class PartnerController extends Controller
             $this->currentRevision($order, $input['revision']);
             abort_unless($stops->firstWhere('picked_up', false)['id'] === $stop['id'], 409, 'Complete the current pickup first.');
             $this->dispatchChecks($order);
+            abort_unless($stop['pickup_ready'], 409, 'The restaurant is still preparing this order. Refresh after it is marked ready.');
             DB::table('order_items')->where('order_id', $order->id)->whereIn('id', $stop['items']->pluck('id'))->update(['picked_up_at' => now(), 'updated_at' => now()]);
             $remaining = DB::table('order_items')->where('order_id', $order->id)->whereNull('picked_up_at')->exists();
             DB::table('orders')->where('id', $order->id)->update(['status' => $remaining ? 'picking' : 'out_for_delivery', 'revision' => $order->revision + 1, 'updated_at' => now()]);
@@ -222,6 +224,7 @@ class PartnerController extends Controller
 
     private function canWork(Request $request, object $order): void
     {
+        abort_if($order->vendor_rejection_reason && DB::table('customer_requests')->where('order_id', $order->id)->where('type', 'cancellation')->where('status', 'requested')->exists(), 409, 'A vendor rejected this order. Wait for admin review before pickup.');
         ServiceLocations::assertPartner($request->attributes->get('partner')->id, $order->locality_id);
         $identity = $request->attributes->get('partner');
         $partner = DB::table('delivery_partners')->where('id', $identity->id)->lockForUpdate()->first();

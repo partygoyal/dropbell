@@ -1,3 +1,4 @@
+import 'live_location.dart';
 import 'assignment_alerts.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -1047,6 +1048,18 @@ class _RiderDeliveryState extends State<RiderDelivery>
                           ),
                       ],
                     ),
+                    if (current.status == 'out_for_delivery')
+                      LiveLocationSharing(
+                        key: ValueKey(current.reference),
+                        api: widget.api,
+                        reference: current.reference,
+                      ),
+                    if (current.vendorReviewRequired)
+                      const Surface(
+                        child: Text(
+                          'A shop cannot fulfil this order. Wait for admin review before pickup.',
+                        ),
+                      ),
                     if (current.active && stop != null) ...[
                       const SizedBox(height: 18),
                       Text(
@@ -1057,6 +1070,20 @@ class _RiderDeliveryState extends State<RiderDelivery>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (stop.requiresPreparation)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: Text(
+                                  stop.pickupReady
+                                      ? 'Ready for pickup'
+                                      : stop.preparationStatus == 'preparing'
+                                      ? 'Restaurant is preparing your order'
+                                      : 'Waiting for restaurant acceptance',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
                             Text(
                               stop.name,
                               style: Theme.of(context).textTheme.titleLarge,
@@ -1080,7 +1107,12 @@ class _RiderDeliveryState extends State<RiderDelivery>
                       ),
                       const SizedBox(height: 18),
                       FilledButton(
-                        onPressed: busy || confirming || !reviewed
+                        onPressed:
+                            busy ||
+                                confirming ||
+                                !reviewed ||
+                                !stop.pickupReady ||
+                                current.vendorReviewRequired
                             ? null
                             : () => update(stop: stop),
                         child: const Text('Confirm pickup'),

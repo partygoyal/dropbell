@@ -591,6 +591,55 @@ void main() {
     expect(writes, 1);
   });
 
+  testWidgets(
+    'restaurant pickup stays disabled until vendor marks the food ready',
+    (tester) async {
+      var ready = false;
+      final api = PartnerApi(
+        baseUrl: 'https://example.test/api',
+        store: MemoryTokens(),
+        client: MockClient((_) async {
+          final order = sampleOrder();
+          final stop = (order['stops'] as List).first;
+          stop['requires_preparation'] = true;
+          stop['pickup_ready'] = ready;
+          stop['preparation_status'] = ready ? 'ready' : 'preparing';
+          return jsonResponse({'data': order});
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RiderDelivery(api: api, reference: 'order-123'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Restaurant is preparing your order'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Confirm pickup'),
+            )
+            .onPressed,
+        isNull,
+      );
+      ready = true;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('Ready for pickup'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Confirm pickup'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      api.close();
+    },
+  );
+
   test('prepaid and COD values remain in paise', () {
     final order = RiderOrder.fromJson(sampleOrder());
     expect(money(order.codPaise), '₹125.50');

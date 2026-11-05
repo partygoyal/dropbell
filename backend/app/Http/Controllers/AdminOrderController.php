@@ -150,7 +150,7 @@ class AdminOrderController extends Controller
                     }
                 }
                 if ($quantity) {
-                    $updatedItems[] = ['product_id' => $item->product_id, 'product_name' => $item->product_name, 'pack_size' => $item->pack_size, 'unit_price_paise' => $item->unit_price_paise, 'quantity' => $quantity, 'vendor_id' => $item->vendor_id, 'vendor_product_id' => $item->vendor_product_id, 'vendor_name' => $item->vendor_name, 'pickup_address' => $item->pickup_address];
+                    $updatedItems[] = ['selected_options' => $item->selected_options, 'product_id' => $item->product_id, 'product_name' => $item->product_name, 'pack_size' => $item->pack_size, 'unit_price_paise' => $item->unit_price_paise, 'quantity' => $quantity, 'vendor_id' => $item->vendor_id, 'vendor_product_id' => $item->vendor_product_id, 'vendor_name' => $item->vendor_name, 'pickup_address' => $item->pickup_address];
                     $subtotal += $quantity * $item->unit_price_paise;
                 }
             }

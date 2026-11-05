@@ -5,8 +5,13 @@ import 'customer_api.dart';
 import 'ui.dart';
 
 class PromotionCarousel extends StatefulWidget {
-  const PromotionCarousel({super.key, required this.api});
+  const PromotionCarousel({
+    super.key,
+    required this.api,
+    this.section = 'groceries',
+  });
   final CustomerApi api;
+  final String section;
   @override
   State<PromotionCarousel> createState() => _PromotionCarouselState();
 }
@@ -53,6 +58,11 @@ class _PromotionCarouselState extends State<PromotionCarousel>
       final rows = (result['data'] as List)
           .whereType<Map>()
           .where((row) => row['title'] is String && row['id'] is int)
+          .where(
+            (row) =>
+                row['banner_section'] == 'all' ||
+                (row['banner_section'] ?? 'groceries') == widget.section,
+          )
           .map((row) => Map<String, dynamic>.from(row))
           .toList();
       if (!mounted) return;
@@ -189,6 +199,7 @@ class _PromotionCreativeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final food = offer['banner_section'] == 'food';
     final theme = number % 3;
     final dark = theme == 0;
     final ink = dark ? Colors.white : navy;
@@ -248,11 +259,17 @@ class _PromotionCreativeCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      [
-                        'FRESH FINDS. BIG SAVINGS.',
-                        'YOUR EVERYDAY, FOR LESS.',
-                        'A BAG FULL OF GOOD DEALS.',
-                      ][theme],
+                      (food
+                          ? [
+                              'BIG FLAVOUR. LITTLE PRICES.',
+                              'A FEAST FROM YOUR NEIGHBOURHOOD.',
+                              'SOMETHING SWEET. SOMETHING SPECIAL.',
+                            ]
+                          : [
+                              'FRESH FINDS. BIG SAVINGS.',
+                              'YOUR EVERYDAY, FOR LESS.',
+                              'A BAG FULL OF GOOD DEALS.',
+                            ])[theme],
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w800,

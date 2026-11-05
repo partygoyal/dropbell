@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'customer_api.dart';
 import 'ui.dart';
 import 'support.dart';
+import 'discovery.dart';
 
 class CustomerOrderPage extends StatefulWidget {
   const CustomerOrderPage({
@@ -9,10 +10,12 @@ class CustomerOrderPage extends StatefulWidget {
     required this.api,
     required this.reference,
     this.initial,
+    this.reorder,
   });
   final CustomerApi api;
   final String reference;
   final CustomerOrder? initial;
+  final Future<void> Function(String)? reorder;
   @override
   State<CustomerOrderPage> createState() => _CustomerOrderPageState();
 }
@@ -84,6 +87,11 @@ class _CustomerOrderPageState extends State<CustomerOrderPage> {
           if (busy) const LinearProgressIndicator(),
           if (error != null) ErrorBox(error!, retry: busy ? null : refresh),
           if (current != null) ...[
+            OrderDiscovery(
+              api: widget.api,
+              order: current,
+              reorder: widget.reorder,
+            ),
             if (current.sample)
               const Chip(
                 label: Text('Sample order • No real delivery or payment'),
@@ -93,9 +101,25 @@ class _CustomerOrderPageState extends State<CustomerOrderPage> {
                   ? 'Order cancelled'
                   : current.status == 'delivered'
                   ? 'Delivered with care.'
-                  : 'Your order is on its way.',
+                  : current.json['vendorReviewRequired'] == true
+                  ? 'Your order is awaiting admin review.'
+                  : current.status == 'out_for_delivery'
+                  ? 'Your order is on its way.'
+                  : 'Your order is being prepared.',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
+            if (current.json['vendorRejectionReason'] is String)
+              ShopCard(
+                child: Text(
+                  'Restaurant update: ${current.json['vendorRejectionReason']}',
+                ),
+              ),
+            if (current.json['estimatedReadyAt'] is String)
+              ShopCard(
+                child: Text(
+                  'Estimated preparation completion: ${DateTime.parse(current.json['estimatedReadyAt']).toLocal()}. Delivery follows pickup.',
+                ),
+              ),
             const SizedBox(height: 12),
             SelectableText(current.id, style: const TextStyle(color: muted)),
             const SizedBox(height: 10),
@@ -149,7 +173,9 @@ class _CustomerOrderPageState extends State<CustomerOrderPage> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(item['name']),
-                subtitle: Text('${item['qty']} × ${item['quantity']}'),
+                subtitle: Text(
+                  '${item['qty']} × ${item['quantity']}${(item['options'] as List? ?? []).isNotEmpty ? ' · ${(item['options'] as List).map((o) => o['name']).join(', ')}' : ''}',
+                ),
                 trailing: Text(
                   rupees(
                     ((item['price'] as num) * 100).round() *

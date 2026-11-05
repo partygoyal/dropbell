@@ -1,7 +1,7 @@
 async function proxy(request) {
   try {
     const origin = process.env.LARAVEL_API_URL || 'http://127.0.0.1:8000';
-    const response = await fetch(`${origin}/api/promotions${request.method === 'POST' ? '/validate' : ''}`, {
+    const response = await fetch(`${origin}/api/promotions${request.method === 'POST' ? '/validate' : new URL(request.url).searchParams.get('listing') === 'all' ? '?listing=all' : ''}`, {
       method: request.method, cache: 'no-store', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000),
       ...(request.method === 'POST' ? { body: await request.text() } : {}),
     });

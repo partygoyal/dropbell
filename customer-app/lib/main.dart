@@ -1,4 +1,6 @@
 import 'promotions.dart';
+import 'discovery.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import 'app_recovery.dart';
 import 'package:flutter/material.dart';
@@ -170,7 +172,8 @@ class _CustomerHomeState extends State<CustomerHome> {
     if (!mounted || !api.signedIn) return;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => CustomerOrderPage(api: api, reference: reference),
+        builder: (_) =>
+            CustomerOrderPage(api: api, reference: reference, reorder: reorder),
       ),
     );
     if (mounted) await loadAccount();
@@ -198,6 +201,7 @@ class _CustomerHomeState extends State<CustomerHome> {
       accountError,
       startupError;
   int? subcategory;
+  String shoppingSection = 'food';
   String search = '';
   final searchInput = TextEditingController();
   int tab = 0;
@@ -452,9 +456,69 @@ class _CustomerHomeState extends State<CustomerHome> {
       return;
     }
     try {
+      if (product.optionGroups.isNotEmpty) {
+        final configured = await chooseDishOptions(
+          context,
+          product,
+          cart.lines[product.id],
+        );
+        if (configured == null) return;
+        product = configured;
+      }
+      if (!mounted) return;
+      if (cart.lines.isNotEmpty && cart.vendorId != product.vendorId) {
+        final replace = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Start a new bag?'),
+            content: const Text(
+              'This item belongs to another shop. Starting a new bag removes the items currently in your bag.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Keep my bag'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Start new bag'),
+              ),
+            ],
+          ),
+        );
+        if (replace != true) return;
+        await cart.clear();
+      }
+      final previous = cart.lines[product.id];
+      final changedOptions =
+          previous != null &&
+          previous.product.optionIds.join('|') != product.optionIds.join('|');
+      if (changedOptions && mounted) {
+        final replace = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Replace this item’s options?'),
+            content: const Text(
+              'This replaces the quantity and choices for this product in your bag.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Keep item'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Replace item'),
+              ),
+            ],
+          ),
+        );
+        if (replace != true) return;
+      }
       await cart.setQuantity(
         product,
-        (cart.lines[product.id]?.quantity ?? 0) + quantity,
+        (changedOptions ? 0 : (cart.lines[product.id]?.quantity ?? 0)) +
+            quantity,
       );
     } catch (e) {
       if (mounted) notifyError(context, e);
@@ -489,6 +553,14 @@ class _CustomerHomeState extends State<CustomerHome> {
                 ),
               ),
               const SizedBox(height: 12),
+              FavouriteButton(api: api, id: product.id),
+              Text(
+                'Diet: ${(product.json['dietary_label'] ?? 'unspecified').toString().replaceAll('_', ' ')}',
+              ),
+              Text(
+                'Allergens reported by shop: ${(product.json['allergens'] as List? ?? []).join(', ')}. Ask the kitchen about allergies and cross-contact.',
+              ),
+              ProductReviews(api: api, id: product.id),
               Text(
                 product.name,
                 style: Theme.of(context).textTheme.headlineMedium,
@@ -520,6 +592,31 @@ class _CustomerHomeState extends State<CustomerHome> {
                       Expanded(child: Text(product.json['care_instructions'])),
                     ],
                   ),
+                ),
+              if (product.image?.contains('/food-demo-dishes/') == true)
+                TextButton(
+                  onPressed: () async {
+                    final filename = Uri.parse(
+                      product.image!,
+                    ).pathSegments.last.replaceFirst('.webp', '');
+                    try {
+                      final opened = await launchUrl(
+                        Uri.parse(
+                          'https://dropbell.in/food-photo-credits.html#$filename',
+                        ),
+                        mode: LaunchMode.externalApplication,
+                      );
+                      if (!opened && context.mounted) {
+                        notifyError(
+                          context,
+                          const ApiError('Could not open photo credits.'),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) notifyError(context, e);
+                    }
+                  },
+                  child: const Text('Real dish photo · Photo credit'),
                 ),
               if (product.sample)
                 const Text(
@@ -592,11 +689,128 @@ class _CustomerHomeState extends State<CustomerHome> {
     }
   }
 
+  Future<void> reorder(String reference) async {
+    try {
+      final identity = profile ?? await api.profile();
+      final pending = CheckoutAttempt(api, identity.phone);
+      await pending.restore();
+      if (pending.pending != null) {
+        throw const ApiError(
+          'Recover your saved checkout before replacing the bag.',
+        );
+      }
+      final locality = await api.storage.read('$pinKey:locality');
+      if (locality == null) {
+        throw const ApiError(
+          'Choose your delivery location before reordering.',
+        );
+      }
+      final result = (await api.request(
+        'POST',
+        'customer/orders/$reference/reorder',
+        {'locality_id': int.parse(locality)},
+      ))['data'];
+      final items = result['items'] as List;
+      if (items.isEmpty) {
+        throw const ApiError(
+          'These items are not currently available at your location.',
+        );
+      }
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Order again?'),
+          content: Text(
+            'Replace your bag with ${items.length} available items? ${(result['unavailable'] as List).length} items could not be reordered. Current prices apply.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Replace bag'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      final replacement = <int, CartLine>{
+        for (final row in items)
+          row['product']['id']: CartLine(
+            Product(Map<String, dynamic>.from(row['product'])),
+            row['quantity'],
+          ),
+      };
+      await cart.storage.write(
+        cart.key,
+        cart.encode(replacement, cart.consumed),
+      );
+      await cart.restore();
+      if (mounted) await bag();
+    } catch (e) {
+      if (mounted) notifyError(context, e);
+    }
+  }
+
+  Future<void> favourites() async {
+    if (!await signIn() || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FavouritesPage(
+          api: api,
+          open: (row) async {
+            if (pin == null) {
+              await choosePin();
+              return;
+            }
+            if (row['kind'] == 'vendor') {
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => RestaurantMenuPage(
+                    api: api,
+                    restaurant: {'id': row['target_id'], 'name': row['name']},
+                    pin: pin!,
+                    cart: cart,
+                    add: (product, quantity) =>
+                        add(product, quantity: quantity),
+                    details: details,
+                    openBag: bag,
+                  ),
+                ),
+              );
+            } else {
+              final fresh = await api.catalogue(
+                pin,
+                locality: await api.storage.read('$pinKey:locality'),
+              );
+              final product = fresh.products
+                  .where((p) => p.id == row['target_id'])
+                  .firstOrNull;
+              if (product == null) {
+                throw const ApiError(
+                  'This product is unavailable for your location.',
+                );
+              }
+              await details(product);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> openOrder(CustomerOrder order) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            CustomerOrderPage(api: api, reference: order.id, initial: order),
+        builder: (_) => CustomerOrderPage(
+          api: api,
+          reference: order.id,
+          initial: order,
+          reorder: reorder,
+        ),
       ),
     );
     if (mounted) await loadAccount();
@@ -784,7 +998,13 @@ class _CustomerHomeState extends State<CustomerHome> {
                 : ShopBody(
                     refresh: tab < 2 ? loadCatalogue : loadAccount,
                     children: [
-                      if (tab == 0) PromotionCarousel(api: api),
+                      if (tab < 2) sectionTabs(),
+                      if (tab == 0)
+                        PromotionCarousel(
+                          key: ValueKey(shoppingSection),
+                          api: api,
+                          section: shoppingSection,
+                        ),
                       if (tab < 2) ...catalogueWidgets(),
                       if (tab >= 2) ...[
                         if (accountBusy) const LinearProgressIndicator(),
@@ -948,6 +1168,10 @@ class _CustomerHomeState extends State<CustomerHome> {
                           ),
                           const SizedBox(height: 16),
                           OutlinedButton(
+                            onPressed: favourites,
+                            child: const Text('My favourites'),
+                          ),
+                          OutlinedButton(
                             onPressed: checkout,
                             child: const Text(
                               'Recover an unconfirmed checkout',
@@ -964,11 +1188,139 @@ class _CustomerHomeState extends State<CustomerHome> {
                   ),
           ),
         );
+  Widget sectionTabs() => Padding(
+    padding: const EdgeInsets.only(bottom: 18),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        for (final section in ['food', 'groceries'])
+          Expanded(
+            child: Semantics(
+              selected: shoppingSection == section,
+              child: FilledButton.icon(
+                key: ValueKey('section-$section'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: section == 'food'
+                      ? const Color(0xFFED3346)
+                      : const Color(0xFF22A65A),
+                  foregroundColor: Colors.white,
+                  minimumSize: Size(0, shoppingSection == section ? 54 : 44),
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(12),
+                    ),
+                  ),
+                  side: shoppingSection == section
+                      ? const BorderSide(color: navy, width: 2)
+                      : BorderSide.none,
+                ),
+                onPressed: () => setState(() {
+                  shoppingSection = section;
+                  category = null;
+                  subcategory = null;
+                  search = '';
+                  searchInput.clear();
+                }),
+                icon: Icon(
+                  shoppingSection == section
+                      ? Icons.check_circle
+                      : section == 'food'
+                      ? Icons.restaurant
+                      : Icons.shopping_basket_outlined,
+                  size: 18,
+                ),
+                label: Text(section == 'food' ? 'Food' : 'Groceries'),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+
+  List<Widget> restaurantWidgets() {
+    final term = search.trim().toLowerCase();
+    final restaurants = (catalogue?.vendors ?? <Map<String, dynamic>>[])
+        .where(
+          (v) =>
+              (v['sections'] as List? ?? []).contains('food') &&
+              '${v['name']} ${(v['cuisines'] as List? ?? []).join(' ')}'
+                  .toLowerCase()
+                  .contains(term),
+        )
+        .toList();
+    return [
+      const SectionTitle('Restaurants near you'),
+      if (pin == null)
+        ShopCard(
+          child: TextButton.icon(
+            onPressed: choosePin,
+            icon: const Icon(Icons.location_on_outlined),
+            label: const Text('Choose your delivery location'),
+          ),
+        )
+      else if (!fetching && catalogueError == null && restaurants.isEmpty)
+        const ShopCard(
+          child: Text(
+            'No restaurants match this location or search. Try another cuisine or delivery area.',
+          ),
+        )
+      else
+        for (final restaurant in restaurants)
+          ShopCard(
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: SizedBox(
+                width: 64,
+                height: 64,
+                child: restaurant['image_url'] is String
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          restaurant['image_url'],
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              const Icon(Icons.restaurant, color: blue),
+                        ),
+                      )
+                    : const Icon(Icons.restaurant, color: blue),
+              ),
+              title: Text(restaurant['name']),
+              subtitle: Text(
+                '${(restaurant['cuisines'] as List? ?? []).join(' · ')}\n${restaurant['section_counts']?['food'] ?? restaurant['product_count']} dishes · ${restaurant['city']}\n${restaurant['ordering_status'] == 'busy'
+                    ? 'Busy · orders paused'
+                    : restaurant['ordering_status'] == 'closed'
+                    ? 'Currently closed'
+                    : 'Preparation: about ${restaurant['preparation_minutes'] ?? 25} min'}',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => RestaurantMenuPage(
+                      api: api,
+                      restaurant: restaurant,
+                      pin: pin!,
+                      cart: cart,
+                      add: (product, quantity) =>
+                          add(product, quantity: quantity),
+                      details: details,
+                      openBag: bag,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      const SizedBox(height: 18),
+    ];
+  }
+
   List<Widget> catalogueWidgets() {
     final products =
         catalogue?.products
             .where(
               (p) =>
+                  p.section == shoppingSection &&
                   (category == null || p.category == category) &&
                   (subcategory == null || p.subcategory == subcategory) &&
                   '${p.name} ${p.category}'.toLowerCase().contains(
@@ -982,13 +1334,14 @@ class _CustomerHomeState extends State<CustomerHome> {
             .where(
               (s) => catalogue!.products.any(
                 (p) =>
+                    p.section == shoppingSection &&
                     p.subcategory == s['id'] &&
                     (category == null || p.category == category),
               ),
             )
             .toList() ??
         [];
-    final names = (catalogue?.categories ?? <String>[])
+    final names = (catalogue?.categoriesFor(shoppingSection) ?? <String>[])
         .where(
           (name) => name.toLowerCase().contains(search.toLowerCase().trim()),
         )
@@ -998,32 +1351,16 @@ class _CustomerHomeState extends State<CustomerHome> {
       if (fetching) const LinearProgressIndicator(),
       if (catalogueError != null)
         ErrorBox(catalogueError!, retry: fetching ? null : loadCatalogue),
-      if (tab == 0 && search.isEmpty) ...[
-        GroceryBanner(
-          onShop: () => setState(() {
-            tab = 1;
-            category = null;
-          }),
-        ),
-        const SizedBox(height: 18),
-        const Row(
-          children: [
-            Icon(Icons.local_shipping_outlined, color: blue, size: 18),
-            SizedBox(width: 7),
-            Expanded(
-              child: Text(
-                'Daily essentials, delivered with care.',
-                style: TextStyle(color: muted, fontSize: 12),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 22),
-      ],
       if (showCategories) ...[
         Row(
           children: [
-            const Expanded(child: SectionTitle('Shop by category')),
+            Expanded(
+              child: SectionTitle(
+                shoppingSection == 'food'
+                    ? 'What are you craving?'
+                    : 'Shop by category',
+              ),
+            ),
             if (tab == 0)
               TextButton(
                 onPressed: () => setState(() => tab = 1),
@@ -1031,7 +1368,7 @@ class _CustomerHomeState extends State<CustomerHome> {
               ),
           ],
         ),
-        if (names.isEmpty && catalogue != null)
+        if (names.isEmpty && products.isEmpty && catalogue != null)
           const ShopCard(
             child: Text('No matching categories. Try another search.'),
           ),
@@ -1052,6 +1389,9 @@ class _CustomerHomeState extends State<CustomerHome> {
                     width: width,
                     child: CategoryTile(
                       name: name,
+                      imageUrl: catalogue?.categoryDetails
+                          .where((c) => c['name'] == name)
+                          .firstOrNull?['image_url'],
                       large: tab != 0,
                       onTap: () => setState(() {
                         category = name;
@@ -1068,7 +1408,8 @@ class _CustomerHomeState extends State<CustomerHome> {
         ),
         const SizedBox(height: 22),
       ],
-      if (!showCategories) ...[
+      if (tab == 0 && shoppingSection == 'food') ...restaurantWidgets(),
+      if (!showCategories || search.trim().isNotEmpty) ...[
         Row(
           children: [
             Expanded(
@@ -1171,6 +1512,16 @@ class ProductTile extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 4),
+                    if (product.section == 'food')
+                      Text(
+                        (product.json['dietary_label'] ?? 'Diet not specified')
+                            .toString()
+                            .replaceAll('_', ' '),
+                      ),
+                    if ((product.json['review_count'] as int? ?? 0) > 0)
+                      Text(
+                        '★ ${product.json['rating']}/5 · ${product.json['review_count']} reviews',
+                      ),
                     Text(
                       product.pack,
                       style: const TextStyle(color: muted, fontSize: 12),
@@ -1222,7 +1573,9 @@ class _ProductPurchaseControlsState extends State<ProductPurchaseControls> {
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: widget.cart,
     builder: (context, _) {
-      final inCart = widget.cart.lines[widget.product.id]?.quantity ?? 0;
+      final inCart = widget.cart.vendorId == widget.product.vendorId
+          ? (widget.cart.lines[widget.product.id]?.quantity ?? 0)
+          : 0;
       final remaining = (widget.product.maxQuantity - inCart).clamp(
         0,
         widget.product.maxQuantity,
@@ -1289,4 +1642,142 @@ class _ProductPurchaseControlsState extends State<ProductPurchaseControls> {
       );
     },
   );
+}
+
+class RestaurantMenuPage extends StatefulWidget {
+  const RestaurantMenuPage({
+    super.key,
+    required this.api,
+    required this.restaurant,
+    required this.pin,
+    required this.cart,
+    required this.add,
+    required this.details,
+    required this.openBag,
+  });
+  final CustomerApi api;
+  final Map<String, dynamic> restaurant;
+  final String pin;
+  final ShoppingCart cart;
+  final Future<void> Function(Product, int) add;
+  final Future<void> Function(Product) details;
+  final Future<void> Function() openBag;
+  @override
+  State<RestaurantMenuPage> createState() => _RestaurantMenuPageState();
+}
+
+class _RestaurantMenuPageState extends State<RestaurantMenuPage> {
+  Catalogue? menu;
+  String? error;
+  String search = '';
+  bool loading = true;
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final locality = await widget.api.storage.read(
+        'customer:${widget.api.baseUrl}:pin:locality',
+      );
+      final result = await widget.api.catalogue(
+        widget.pin,
+        locality: locality,
+        vendorId: widget.restaurant['id'],
+      );
+      if (mounted) setState(() => menu = result);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          error = friendlyError(e);
+          menu = null;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final products = (menu?.products ?? <Product>[])
+        .where(
+          (p) =>
+              p.section == 'food' &&
+              '${p.name} ${p.category}'.toLowerCase().contains(
+                search.trim().toLowerCase(),
+              ),
+        )
+        .toList();
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.restaurant['name']),
+        actions: [
+          AnimatedBuilder(
+            animation: widget.cart,
+            builder: (context, _) => TextButton.icon(
+              onPressed: widget.openBag,
+              icon: const Icon(
+                Icons.shopping_bag_outlined,
+                color: Colors.white,
+              ),
+              label: Text(
+                '${widget.cart.count}',
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: ShopBody(
+        refresh: load,
+        children: [
+          FavouriteButton(
+            api: widget.api,
+            id: widget.restaurant['id'],
+            kind: 'vendor',
+          ),
+          Text((widget.restaurant['cuisines'] as List? ?? []).join(' · ')),
+          Text(
+            widget.restaurant['ordering_status'] == 'busy'
+                ? 'This restaurant is busy. New orders are paused.'
+                : widget.restaurant['ordering_status'] == 'closed'
+                ? 'This restaurant is currently closed.'
+                : 'Preparation estimate: about ${widget.restaurant['preparation_minutes'] ?? 25} minutes.',
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            decoration: const InputDecoration(
+              labelText: 'Search this menu',
+              prefixIcon: Icon(Icons.search),
+            ),
+            onChanged: (value) => setState(() => search = value),
+          ),
+          const SizedBox(height: 16),
+          if (loading) const LinearProgressIndicator(),
+          if (error != null) ErrorBox(error!, retry: loading ? null : load),
+          if (!loading && error == null && products.isEmpty)
+            const ShopCard(
+              child: Text(
+                'No available dishes match this menu. Try another search or pull down to refresh.',
+              ),
+            ),
+          for (final product in products)
+            ProductTile(
+              product: product,
+              cart: widget.cart,
+              hasPin: true,
+              open: () => widget.details(product),
+              add: (quantity) => widget.add(product, quantity),
+            ),
+        ],
+      ),
+    );
+  }
 }

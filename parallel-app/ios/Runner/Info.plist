@@ -73,5 +73,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>Share your current position with the customer only while you enable location sharing on an active delivery screen.</string>
 </dict>
 </plist>

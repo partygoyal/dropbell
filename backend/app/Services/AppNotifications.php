@@ -119,7 +119,7 @@ class AppNotifications
             }
             try {
                 $order = $notification->order_id ? DB::table('orders')->find($notification->order_id) : null;
-                if ($notification->read_at !== null || ($device->owner_type === 'partner' && str_starts_with($notification->event_type, 'assigned:') && ((int) $order?->delivery_partner_id !== $device->owner_id || ! in_array($order?->status, ['received', 'picking', 'out_for_delivery'], true)))) {
+                if ($notification->read_at !== null || ($device->owner_type === 'partner' && (str_starts_with($notification->event_type, 'assigned:') || str_starts_with($notification->event_type, 'vendor-ready:')) && ((int) $order?->delivery_partner_id !== $device->owner_id || ! in_array($order?->status, ['received', 'picking', 'out_for_delivery'], true)))) {
                     DB::table('app_notification_deliveries')->where('id', $id)->update(['status' => 'cancelled', 'lease_until' => null, 'updated_at' => now()]);
 
                     continue;

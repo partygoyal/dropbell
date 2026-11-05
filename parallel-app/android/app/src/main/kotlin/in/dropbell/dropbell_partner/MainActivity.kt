@@ -12,6 +12,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var alertPlayer: MediaPlayer? = null
+    private var locationBridge: DeliveryLocationBridge? = null
     private val alertAttributes = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_NOTIFICATION)
         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -19,6 +20,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        locationBridge = DeliveryLocationBridge(this, flutterEngine.dartExecutor.binaryMessenger)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel("dropbell_assignments_v1", "New delivery assignments", NotificationManager.IMPORTANCE_HIGH)
             channel.description = "Ringtone when a delivery is assigned to you"
@@ -59,7 +61,13 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        locationBridge?.permissionsResult(requestCode)
+    }
+
     override fun onDestroy() {
+        locationBridge?.close()
         alertPlayer?.release()
         alertPlayer = null
         super.onDestroy()

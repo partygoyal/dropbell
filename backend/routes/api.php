@@ -3,8 +3,10 @@
 use App\Http\Controllers\AppNotificationController;
 use App\Http\Controllers\CustomerAftercareController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CustomerDiscoveryController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\CustomerPasswordController;
+use App\Http\Controllers\DeliveryTrackingController;
 use App\Http\Controllers\PartnerController;
 use App\Http\Controllers\SupportController;
 use App\Http\Middleware\AuthenticateCustomer;
@@ -13,6 +15,7 @@ use App\Services\DeliveryZones;
 use App\Services\Marketplace;
 use App\Services\Promotions;
 use App\Services\ServiceLocations;
+use App\Services\VendorOperations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -30,11 +33,15 @@ Route::prefix('partner')->middleware([AuthenticatePartner::class, 'throttle:120,
     Route::patch('/availability', [PartnerController::class, 'availability']);
     Route::post('/logout', [PartnerController::class, 'logout']);
     Route::get('/orders', [PartnerController::class, 'orders']);
+    Route::post('/orders/{reference}/location/start', [DeliveryTrackingController::class, 'start']);
+    Route::post('/orders/{reference}/location', [DeliveryTrackingController::class, 'update']);
+    Route::delete('/orders/{reference}/location', [DeliveryTrackingController::class, 'stop']);
     Route::get('/orders/{reference}', [PartnerController::class, 'show']);
     Route::post('/orders/{reference}/pickup', [PartnerController::class, 'pickup']);
     Route::post('/orders/{reference}/complete', [PartnerController::class, 'complete']);
 });
 
+Route::get('/products/{id}/reviews', [CustomerDiscoveryController::class, 'reviews'])->whereNumber('id');
 Route::get('/health', function () {
     DB::select('SELECT 1');
 
@@ -59,12 +66,14 @@ Route::get('/products', function (Request $request) {
 
     $categories = DB::table('categories')->where('active', true)->when($input['section'] ?? null, fn ($q, $section) => $q->where('shopping_section', $section))->orderBy('id')->get(['id', 'name', 'shopping_section', 'banner_path'])->map(fn ($category) => (object) ['id' => $category->id, 'name' => $category->name, 'shopping_section' => $category->shopping_section, 'image_url' => $category->banner_path ? asset('storage/'.$category->banner_path) : null]);
     $sections = $categories->pluck('shopping_section', 'name');
-    $vendorSections = Marketplace::offers($input['postal_code'] ?? null)->whereIn('vendor_products.product_id', Marketplace::catalogue()->select('products.id'))->join('products', 'products.id', '=', 'vendor_products.product_id')->join('categories', 'categories.name', '=', 'products.category')->select('vendor_products.vendor_id', 'categories.shopping_section')->selectRaw('COUNT(DISTINCT vendor_products.product_id) as product_count, MIN(products.id) as first_product_id')->groupBy('vendor_products.vendor_id', 'categories.shopping_section')->get()->groupBy('vendor_id');
+    $vendorSections = Marketplace::offers($input['postal_code'] ?? null, null, true)->whereIn('vendor_products.product_id', Marketplace::catalogue()->select('products.id'))->join('products', 'products.id', '=', 'vendor_products.product_id')->join('categories', 'categories.name', '=', 'products.category')->select('vendor_products.vendor_id', 'categories.shopping_section')->selectRaw('COUNT(DISTINCT vendor_products.product_id) as product_count, MIN(products.id) as first_product_id')->groupBy('vendor_products.vendor_id', 'categories.shopping_section')->get()->groupBy('vendor_id');
     $vendorImages = DB::table('products')->whereIn('id', $vendorSections->flatten(1)->pluck('first_product_id'))->pluck('image_path', 'id');
-    $vendorCuisines = Marketplace::offers($input['postal_code'] ?? null)->whereIn('vendor_products.product_id', Marketplace::catalogue()->select('products.id'))->join('products', 'products.id', '=', 'vendor_products.product_id')->join('categories', 'categories.name', '=', 'products.category')->where('categories.shopping_section', 'food')->select('vendor_products.vendor_id', 'categories.name')->distinct()->get()->groupBy('vendor_id');
-    $vendors = Marketplace::publicVendors($input['postal_code'] ?? null)->get()->map(fn ($vendor) => (array) $vendor + ['image_url' => ($path = $vendorImages->get(($vendorSections->get($vendor->id, collect())->firstWhere('shopping_section', 'food') ?? $vendorSections->get($vendor->id, collect())->first())?->first_product_id)) ? asset('storage/'.$path) : null, 'cuisines' => $vendorCuisines->get($vendor->id, collect())->pluck('name')->values()->all(), 'sections' => $vendorSections->get($vendor->id, collect())->pluck('shopping_section')->unique()->values()->all(), 'section_counts' => $vendorSections->get($vendor->id, collect())->pluck('product_count', 'shopping_section')->all()])->filter(fn ($vendor) => empty($input['section']) || in_array($input['section'], $vendor['sections'], true))->values();
+    $vendorCuisines = Marketplace::offers($input['postal_code'] ?? null, null, true)->whereIn('vendor_products.product_id', Marketplace::catalogue()->select('products.id'))->join('products', 'products.id', '=', 'vendor_products.product_id')->join('categories', 'categories.name', '=', 'products.category')->where('categories.shopping_section', 'food')->select('vendor_products.vendor_id', 'categories.name')->distinct()->get()->groupBy('vendor_id');
+    $vendorRatings = DB::table('product_reviews')->where('status', 'published')->select('vendor_id')->selectRaw('AVG(rating) as average,COUNT(*) as total')->groupBy('vendor_id')->get()->keyBy('vendor_id');
+    $operatingVendors = DB::table('vendors')->get(['id', 'operating_mode', 'opening_hours', 'preparation_minutes'])->keyBy('id');
+    $vendors = Marketplace::publicVendors($input['postal_code'] ?? null)->get()->map(fn ($vendor) => (array) $vendor + ['rating' => $vendorRatings->has($vendor->id) ? round((float) $vendorRatings->get($vendor->id)->average, 1) : null, 'review_count' => (int) ($vendorRatings->get($vendor->id)?->total ?? 0)] + VendorOperations::present($operatingVendors->get($vendor->id)) + ['image_url' => ($path = $vendorImages->get(($vendorSections->get($vendor->id, collect())->firstWhere('shopping_section', 'food') ?? $vendorSections->get($vendor->id, collect())->first())?->first_product_id)) ? asset('storage/'.$path) : null, 'cuisines' => $vendorCuisines->get($vendor->id, collect())->pluck('name')->values()->all(), 'sections' => $vendorSections->get($vendor->id, collect())->pluck('shopping_section')->unique()->values()->all(), 'section_counts' => $vendorSections->get($vendor->id, collect())->pluck('product_count', 'shopping_section')->all()])->filter(fn ($vendor) => empty($input['section']) || in_array($input['section'], $vendor['sections'], true))->values();
 
-    return response()->json(['vendors' => $vendors, 'categories' => $categories, 'sub_categories' => DB::table('sub_categories')->where('active', true)->whereIn('category_id', $categories->pluck('id'))->orderBy('name')->get(['id', 'name', 'category_id']), 'data' => $query->orderBy('products.id')->get()->map(fn (object $product): array => Marketplace::present($product) + ['shopping_section' => $sections[$product->category] ?? 'groceries'])]);
+    return response()->json(['vendors' => $vendors, 'categories' => $categories, 'sub_categories' => DB::table('sub_categories')->where('active', true)->whereIn('category_id', $categories->pluck('id'))->orderBy('name')->get(['id', 'name', 'category_id']), 'data' => Marketplace::enrich($query->orderBy('products.id')->get(), $input['postal_code'] ?? null, isset($input['vendor_id']) ? (int) $input['vendor_id'] : null)->map(fn (object $product): array => Marketplace::present($product) + ['shopping_section' => $sections[$product->category] ?? 'groceries'])]);
 });
 Route::get('/products/{id}', function (Request $request, int $id) {
     $input = $request->validate(['postal_code' => ['nullable', 'regex:/^[1-9]\d{5}$/'], 'locality_id' => 'nullable|integer', 'vendor_id' => 'nullable|integer|min:1']);
@@ -100,6 +109,11 @@ Route::prefix('customer')->middleware([AuthenticateCustomer::class, 'throttle:12
     Route::delete('/notification-devices/{installation}', [AppNotificationController::class, 'unregister'])->whereUuid('installation');
 
     Route::post('/quote', [CustomerOrderController::class, 'quote']);
+    Route::get('/favourites', [CustomerDiscoveryController::class, 'favourites']);
+    Route::put('/favourites', [CustomerDiscoveryController::class, 'favourite']);
+    Route::post('/orders/{reference}/reviews', [CustomerDiscoveryController::class, 'review']);
+    Route::post('/orders/{reference}/reorder', [CustomerDiscoveryController::class, 'reorder']);
+    Route::get('/orders/{reference}/tracking', [DeliveryTrackingController::class, 'show']);
     Route::get('/me', [CustomerController::class, 'profile']);
     Route::patch('/me', [CustomerController::class, 'updateProfile']);
     Route::post('/logout', [CustomerController::class, 'logout']);
@@ -117,7 +131,7 @@ Route::prefix('customer')->middleware([AuthenticateCustomer::class, 'throttle:12
 
 Route::get('/delivery-options', fn () => response()->json(['per_km_enabled' => DeliveryZones::enabled(), 'cities' => DB::table('delivery_cities')->where('active', true)->orderBy('name')->get(['id', 'name', 'state'])]));
 
-Route::get('/promotions', fn () => response()->json(['data' => Promotions::banners()])->header('Cache-Control', 'no-store'));
+Route::get('/promotions', fn (Request $request) => response()->json(['data' => $request->query('listing') === 'all' ? Promotions::listing() : Promotions::banners()])->header('Cache-Control', 'no-store'));
 
 Route::post('/promotions/validate', function (Request $request) {
     $input = $request->validate(['code' => 'required|string|max:30', 'subtotal' => 'required|integer|min:0|max:100000000']);

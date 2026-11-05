@@ -299,6 +299,7 @@ String money(int paise) => '₹${(paise / 100).toStringAsFixed(2)}';
 class RiderOrder {
   RiderOrder.fromJson(Map<String, dynamic> json)
     : reference = json['reference'],
+      vendorReviewRequired = json['vendor_review_required'] ?? false,
       revision = json['revision'],
       status = json['status'],
       address = Map<String, dynamic>.from(json['address']),
@@ -310,6 +311,7 @@ class RiderOrder {
           .map((e) => RiderStop.fromJson(e))
           .toList();
   final String reference, status;
+  final bool vendorReviewRequired;
   final int revision, codPaise, totalPaise;
   final String? receipt;
   final DateTime? deliveredAt;
@@ -335,11 +337,18 @@ class RiderStop {
           ? ''
           : formatAddress(Map<String, dynamic>.from(json['address'])),
       pickedUp = json['picked_up'],
+      pickupReady = json['pickup_ready'] ?? true,
+      requiresPreparation = json['requires_preparation'] ?? false,
+      preparationStatus = json['preparation_status'] ?? 'awaiting_vendor',
       items = (json['items'] as List)
-          .map((e) => '${e['name']} · ${e['pack_size']} × ${e['quantity']}')
+          .map(
+            (e) =>
+                '${e['name']} · ${e['pack_size']} × ${e['quantity']}${(e['options'] as List? ?? []).isNotEmpty ? ' · ${(e['options'] as List).map((o) => o['name']).join(', ')}' : ''}',
+          )
           .toList();
   final String id, name, address;
   final String? phone;
-  final bool pickedUp;
+  final bool pickedUp, pickupReady, requiresPreparation;
+  final String preparationStatus;
   final List<String> items;
 }

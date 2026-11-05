@@ -1,0 +1,14 @@
+{
+  "generator": "built-in image_gen",
+  "usage": "Illustrative promotional artwork, not supplier product photography",
+  "assets": [
+    {
+      "path": "north-indian-thali.webp",
+      "prompt": "Use case: ads-marketing. Asset type: transparent food artwork for a Dropbell North Indian thali offer banner; the website places editable text on the left and this artwork on the right. Create a premium appetizing photorealistic Indian vegetarian thali, a large round polished steel thali in a three-quarter overhead view, with separate small steel katoris of rich dal makhani, paneer butter masala, chole, raita, a small mound of jeera rice, folded butter naan, papad, pickle, onion and lemon, one gulab jamun. Beautiful natural food textures, generous but neat portions, warm studio lighting, subtle natural contact shadow. Show the entire thali without cropping, isolated on a genuinely transparent background, square composition. No words, numbers, labels, logos, watermark, human hands, phones or background surface. This is promotional illustrative artwork, not supplier product photography."
+    },
+    {
+      "path": "north-indian-spread.webp",
+      "prompt": "Use case: ads-marketing. Asset type: transparent promotional food artwork for the right side of a Dropbell North Indian food offer banner. Create a premium photorealistic appetizing spread of North Indian vegetarian comfort food: a rich orange paneer butter masala in a beautiful small copper serving bowl, creamy dark dal makhani in another copper bowl, a basket of fluffy folded butter naan, a compact serving of fragrant jeera rice, and small onion-lemon garnish. Three-quarter overhead food-advertising composition, cohesive compact triangular arrangement with all dishes fully visible and generous natural food textures. Warm soft studio lighting and subtle contact shadows. Isolate the entire spread on a genuinely transparent background, square composition. Absolutely no text, typography, labels, prices, logos, watermark, cutlery clutter, hands or background surface. This is illustrative promotional food artwork, not supplier product photography."
+    }
+  ]
+}

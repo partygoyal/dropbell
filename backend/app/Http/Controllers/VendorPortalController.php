@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AppNotifications;
 use App\Services\Marketplace;
+use App\Services\OrderAftercare;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -28,7 +30,84 @@ class VendorPortalController extends Controller
     {
         $vendor = $request->attributes->get('vendor');
 
-        return view('vendor.dashboard', ['vendor' => $vendor, 'selected' => DB::table('vendor_products')->where('vendor_id', $vendor->id)->count(), 'available' => DB::table('vendor_products')->where('vendor_id', $vendor->id)->where('available', true)->count(), 'items' => DB::table('order_items')->join('orders', 'orders.id', '=', 'order_items.order_id')->where('vendor_id', $vendor->id)->select('order_items.product_name', 'order_items.pack_size', 'order_items.quantity', 'order_items.unit_price_paise', 'orders.reference', 'orders.status', 'orders.created_at')->latest('orders.id')->paginate(20)]);
+        return view('vendor.dashboard', ['vendor' => $vendor, 'selected' => DB::table('vendor_products')->where('vendor_id', $vendor->id)->count(), 'preparationOrders' => DB::table('orders')->where('is_sample', false)->whereIn('status', ['received', 'picking'])->whereExists(fn ($q) => $q->selectRaw('1')->from('order_items')->whereColumn('order_items.order_id', 'orders.id')->where('vendor_id', $vendor->id)->whereNull('picked_up_at'))->orderBy('id')->limit(30)->get()->map(fn ($order) => (object) ['id' => $order->id, 'reference' => $order->reference, 'revision' => $order->revision, 'items' => DB::table('order_items')->where('order_id', $order->id)->where('vendor_id', $vendor->id)->get()]), 'available' => DB::table('vendor_products')->where('vendor_id', $vendor->id)->where('available', true)->count(), 'items' => DB::table('order_items')->join('orders', 'orders.id', '=', 'order_items.order_id')->where('vendor_id', $vendor->id)->select('order_items.product_name', 'order_items.pack_size', 'order_items.quantity', 'order_items.unit_price_paise', 'orders.reference', 'orders.status', 'orders.created_at')->latest('orders.id')->paginate(20)]);
+    }
+
+    public function saveOperations(Request $request): RedirectResponse
+    {
+        $input = $request->validate(['revision' => 'required|integer|min:0', 'operating_mode' => 'required|in:open,busy,closed', 'preparation_minutes' => 'required|integer|min:5|max:180', 'schedule_enabled' => 'sometimes|boolean', 'hours' => 'required|array|size:7', 'hours.*.enabled' => 'required|boolean', 'hours.*.opens' => 'required|date_format:H:i', 'hours.*.closes' => 'required|date_format:H:i']);
+        foreach ($input['hours'] as $slot) {
+            if ($slot['enabled'] && $slot['opens'] === $slot['closes']) {
+                throw ValidationException::withMessages(['hours' => 'Opening and closing times must be different. Switch off scheduling for always-open service.']);
+            }
+        }
+        DB::transaction(function () use ($request, $input): void {
+            $vendor = DB::table('vendors')->where('user_id', $request->user()->id)->lockForUpdate()->first();
+            abort_unless($vendor && $vendor->status === 'approved', 403);
+            abort_unless($vendor->revision === (int) $input['revision'], 409, 'Your settings changed. Refresh before saving.');
+            DB::table('vendors')->where('id', $vendor->id)->update(['operating_mode' => $input['operating_mode'], 'preparation_minutes' => $input['preparation_minutes'], 'opening_hours' => ! empty($input['schedule_enabled']) ? json_encode(array_values($input['hours'])) : null, 'revision' => $vendor->revision + 1, 'updated_at' => now()]);
+        });
+
+        return back()->with('status', 'Hours, order availability and preparation time saved.');
+    }
+
+    public function rejectOrder(Request $request, int $id): RedirectResponse
+    {
+        $input = $request->validate(['revision' => 'required|integer|min:0', 'reason' => 'required|string|min:5|max:500']);
+        $vendor = $request->attributes->get('vendor');
+        abort_unless($vendor->status === 'approved', 403);
+        DB::transaction(function () use ($request, $vendor, $id, $input): void {
+            $order = DB::table('orders')->where('id', $id)->where('is_sample', false)->lockForUpdate()->first();
+            $items = DB::table('order_items')->where('order_id', $id)->get();
+            abort_unless($order && $items->contains('vendor_id', $vendor->id), 404);
+            if ($order->vendor_rejected_by === $vendor->id) {
+                return;
+            }
+            abort_unless(in_array($order->status, ['received', 'picking'], true) && $items->every(fn ($item) => $item->picked_up_at === null), 409, 'Pickup has started or the order is final. Contact admin.');
+            abort_unless($order->revision === (int) $input['revision'], 409, 'The order changed. Refresh before rejecting.');
+            abort_if($order->vendor_rejected_by !== null, 409, 'An admin is already reviewing this order.');
+            $reason = ($vendor->business_name ?: 'Vendor').': '.$input['reason'];
+            $singleVendor = $items->every(fn ($item) => $item->vendor_id === $vendor->id);
+            DB::table('orders')->where('id', $id)->update(['vendor_rejection_reason' => $reason, 'vendor_rejected_by' => $vendor->id, 'updated_at' => now()]);
+            if ($singleVendor && $order->payment_status !== 'paid') {
+                OrderAftercare::cancel($order, $request->user()->id, $reason);
+            } else {
+                DB::table('customer_requests')->updateOrInsert(['order_id' => $id, 'type' => 'cancellation'], ['status' => 'requested', 'reason' => 'Vendor rejection: '.$reason, 'amount_paise' => 0, 'created_at' => now(), 'updated_at' => now()]);
+                DB::table('orders')->where('id', $id)->update(['revision' => $order->revision + 1, 'updated_at' => now()]);
+                AppNotifications::customer(DB::table('orders')->find($id), 'vendor-rejected:'.$vendor->id, 'Your order needs a review', $reason.' Dropbell will review your order before pickup.');
+            }
+            OrderAftercare::event($id, $request->user()->id, 'Vendor rejected order', ['vendor_id' => $vendor->id, 'reason' => $input['reason'], 'admin_review' => ! $singleVendor || $order->payment_status === 'paid']);
+        }, 3);
+
+        return back()->with('status', 'Rejection saved. Single-shop unpaid orders are cancelled; other orders go to admin review.');
+    }
+
+    public function prepareOrder(Request $request, int $id): RedirectResponse
+    {
+        $input = $request->validate(['revision' => 'required|integer|min:0', 'action' => 'required|in:accept,ready', 'preparation_minutes' => 'nullable|integer|min:5|max:180']);
+        $vendor = $request->attributes->get('vendor');
+        abort_unless($vendor->status === 'approved', 403);
+        DB::transaction(function () use ($request, $id, $input, $vendor): void {
+            $order = DB::table('orders')->where('id', $id)->where('is_sample', false)->lockForUpdate()->first();
+            $items = DB::table('order_items')->where('order_id', $id)->where('vendor_id', $vendor->id)->get();
+            abort_unless($order && $items->isNotEmpty(), 404);
+            abort_unless(in_array($order->status, ['received', 'picking'], true) && $items->every(fn ($item) => $item->picked_up_at === null), 409, 'This order can no longer be prepared.');
+            abort_if($order->vendor_rejection_reason && DB::table('customer_requests')->where('order_id', $id)->where('type', 'cancellation')->where('status', 'requested')->exists(), 409, 'This order is waiting for admin review.');
+            $column = $input['action'] === 'accept' ? 'vendor_accepted_at' : 'vendor_ready_at';
+            if ($items->every(fn ($item) => $item->{$column} !== null)) {
+                return;
+            }
+            abort_unless($order->revision === (int) $input['revision'], 409, 'The order changed. Refresh before continuing.');
+            abort_if($input['action'] === 'ready' && $items->contains(fn ($item) => $item->vendor_accepted_at === null), 422, 'Accept this order before marking it ready.');
+            DB::table('order_items')->where('order_id', $id)->where('vendor_id', $vendor->id)->whereNull($column)->update([$column => now(), 'updated_at' => now()] + ($input['action'] === 'accept' ? ['estimated_ready_at' => now()->addMinutes($input['preparation_minutes'] ?? $vendor->preparation_minutes)] : []));
+            DB::table('orders')->where('id', $id)->update(['revision' => $order->revision + 1, 'updated_at' => now()]);
+            if ($input['action'] === 'ready' && $order->delivery_partner_id) {
+                AppNotifications::record('partner', $order->delivery_partner_id, DB::table('orders')->find($id), 'vendor-ready:'.$vendor->id.':'.($order->revision + 1), 'Ready for pickup', ($vendor->business_name ?: 'Your pickup shop').' has marked its items ready. Refresh your order before collecting.');
+            }
+            DB::table('order_events')->insert(['order_id' => $id, 'admin_id' => $request->user()->id, 'action' => $input['action'] === 'accept' ? 'Vendor accepted order' : 'Vendor ready for pickup', 'details' => json_encode(['vendor_id' => $vendor->id]), 'created_at' => now(), 'updated_at' => now()]);
+        }, 3);
+
+        return back()->with('status', $input['action'] === 'accept' ? 'Order accepted. Mark it ready when preparation is complete.' : 'Order marked ready for pickup.');
     }
 
     public function onboarding(Request $request): View
